@@ -1,0 +1,8 @@
+terraform.tfvars
+*.tfstate
+*.tfstate.backup
+.terraform/
+.ssh/
+root_password.txt
+.vscode/
+clue.txt
