@@ -3,53 +3,31 @@ terraform {
     proxmox = {
       source = "bpg/proxmox"
     }
-    time = {
-      source = "hashicorp/time"
-    }
   }
 }
 
 locals {
-  # ВНИМАНИЕ: Проверь соответствие! 
-  node_templates = {
-    "horus-pmx-srv01" = 9000
-    "horus-pmx-srv02" = 9001
-    "horus-pmx-srv03" = 9002
-  }
-
   # Ищем ID шаблона по имени ноды, если не нашли — берем дефолт
-  chosen_template_id = lookup(local.node_templates, var.target_node, var.clone_template_id)
+  chosen_template_id = var.clone_template_id
 }
 
-locals {
-  # Карта: нода -> имя хранилища на ней
-  # Это гарантирует, что ВМ на ноде 01 всегда будет использовать быстрый/большой диск этой ноды
-  node_storage_map = {
-    "horus-pmx-srv01" = "storage"      # или тот ID, который ты создал в GUI
-    "horus-pmx-srv02" = "data-ai"      # твой диск на 447G
-    "horus-pmx-srv03" = "data"         # твой диск на 465G
-  }
-
-  # Фиксированный MAC-адрес: если не передан явно в var.mac_address,
-  # генерируется детерминированно на основе VMID (например, 203 -> BC:24:11:00:02:03)
-  final_mac_address = var.mac_address != null ? var.mac_address : format("BC:24:11:00:%02d:%02d", floor(var.vmid / 100), var.vmid % 100)
-}
-
-# 1. Твой основной блок развертывания ВМ
+# Основной блок развертывания ВМ
 resource "proxmox_virtual_environment_vm" "kvm_node" {
   node_name = var.target_node
   vm_id     = var.vmid
   name      = var.hostname
 
-  # ---> ДОБАВЛЕНО: Включаем поддержку агента со стороны Proxmox <---
+  # Включаем поддержку агента со стороны Proxmox
   agent {
     enabled = true
   }
 
-  # Настройка клонирования из шаблона
+  # Клонирование Golden VM с Factory Node.
+  # Целевое хранилище задается ниже в disk.datastore_id.
   clone {
-    vm_id = local.chosen_template_id # <--- ИСПРАВЛЕНО: теперь берем значение из locals!
-    full  = true
+    vm_id     = local.chosen_template_id
+    node_name = var.factory_node
+    full      = true
   }
 
   # CPU и память
@@ -62,28 +40,39 @@ resource "proxmox_virtual_environment_vm" "kvm_node" {
     dedicated = var.memory
   }
 
-  # Диск
+  # Корневой диск
+  # Именно здесь указывается локальное хранилище целевой ноды.
   disk {
-    # Мы обращаемся к карте locals, используя имя ноды как ключ
-    datastore_id = lookup(local.node_storage_map, var.target_node, "local")
+    datastore_id = var.root_storage
     interface    = "scsi0"
     size         = var.disk_size
-    file_format  = var.disk_file_format
+    file_format  = "raw"
+  }
+
+  # Дополнительные диски
+  # Например, persistent data на storage-work для Vault.
+  dynamic "disk" {
+    for_each = var.additional_disks
+
+    content {
+      datastore_id = disk.value.datastore
+      interface    = disk.value.interface
+      size         = disk.value.size
+      file_format  = "raw"
+    }
   }
 
   # Сеть
   network_device {
-    bridge      = "vmbr0"
-    vlan_id     = var.vlan_id
-    mac_address = local.final_mac_address
+    bridge  = var.bridge
+    vlan_id = var.vlan_id
   }
 
-  # Инициализация (настройка пользователя, сети и SSH)
+  # Cloud-Init
   initialization {
     type         = "nocloud"
-    datastore_id = "infra"
-    
-    # Блок dns идет первым внутри initialization:
+    datastore_id = var.root_storage
+
     dns {
       servers = var.dns_servers
     }
@@ -96,18 +85,12 @@ resource "proxmox_virtual_environment_vm" "kvm_node" {
     }
 
     user_account {
-      username = "root"
       password = var.root_password
-      keys     = [can(file(var.ssh_public_key)) ? trimspace(file(var.ssh_public_key)) : trimspace(var.ssh_public_key)]
+      keys = [
+        can(file(var.ssh_public_key))
+        ? trimspace(file(var.ssh_public_key))
+        : trimspace(var.ssh_public_key)
+      ]
     }
   }
-}
-
-# Пауза (лаг) для того, чтобы ВМ успела запуститься и инициализировать qemu-guest-agent/сеть
-resource "time_sleep" "wait_for_vm" {
-  create_duration = "45s"
-
-  depends_on = [
-    proxmox_virtual_environment_vm.kvm_node
-  ]
 }
