@@ -1,0 +1,84 @@
+#!/bin/bash
+set -euo pipefail
+
+# Версия и часовой пояс из переменных Terraform
+BASELINE_VERSION="${baseline_version}"
+TIMEZONE="${timezone}"
+BASE_DIR="/etc/horus-baseline"
+VERSION_FILE="$BASE_DIR/version"
+
+echo "========================================================================"
+echo "          Applying Debian 13 LXC Compatibility Baseline v$BASELINE_VERSION"
+echo "========================================================================"
+
+# Идемпотентность: проверяем, установлена ли уже именно эта версия baseline
+if [ -f "$VERSION_FILE" ]; then
+    CURRENT_VERSION=$(cat "$VERSION_FILE" | grep "debian13-lxc-baseline=" | cut -d'=' -f2 || true)
+    if [ "$CURRENT_VERSION" = "$BASELINE_VERSION" ]; then
+        echo "--> [OK] Debian 13 LXC Baseline v$BASELINE_VERSION is already applied and up-to-date."
+        echo "========================================================================"
+        exit 0
+    else
+        echo "--> [UPGRADE] Detected baseline mismatch (Current: $CURRENT_VERSION, Target: $BASELINE_VERSION). Re-running baseline..."
+    fi
+fi
+
+# 1. systemd-journald compatibility override for unprivileged container mounts
+echo "--> Configuring systemd-journald LXC compatibility override..."
+mkdir -p /etc/systemd/system/systemd-journald.service.d
+
+cat > /etc/systemd/system/systemd-journald.service.d/override.conf << 'EOF'
+[Service]
+# Required for Debian 13 unprivileged LXC containers
+# Disable systemd credential initialization issue
+ImportCredential=
+EOF
+
+echo "--> Reloading systemd manager configuration and restarting journald..."
+systemctl daemon-reload
+systemctl restart systemd-journald || echo "Warning: failed to restart journald. Will apply on next boot."
+
+# 2. Timezone & Localization baseline
+echo "--> Configuring timezone to $TIMEZONE..."
+timedatectl set-timezone "$TIMEZONE" || true
+
+echo "--> Configuring baseline locales..."
+if [ -f /etc/locale.gen ]; then
+    # Предотвращаем дублирование при повторных запусках
+    grep -qxF "ru_RU.UTF-8 UTF-8" /etc/locale.gen || echo "ru_RU.UTF-8 UTF-8" >> /etc/locale.gen
+    grep -qxF "en_US.UTF-8 UTF-8" /etc/locale.gen || echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen
+    locale-gen || true
+fi
+
+# 3. Installing baseline tools (monitoring, diagnostics, networking)
+echo "--> Installing baseline packages..."
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y --no-install-recommends \
+    curl \
+    htop \
+    sudo \
+    dnsutils \
+    iproute2 \
+    ca-certificates
+
+# 4. SSH hardening (Disable empty passwords, DNS reverse lookups)
+echo "--> Applying SSH baseline configurations..."
+mkdir -p /etc/ssh/sshd_config.d
+cat > /etc/ssh/sshd_config.d/90-baseline.conf << 'EOF'
+UseDNS no
+PermitEmptyPasswords no
+EOF
+systemctl reload ssh || systemctl restart ssh || true
+
+# 5. Записываем структурированные метаданные (baseline audit)
+echo "--> Writing baseline audited metadata to $BASE_DIR..."
+mkdir -p "$BASE_DIR"
+echo "debian13-lxc-baseline=$BASELINE_VERSION" > "$VERSION_FILE"
+echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ")" > "$BASE_DIR/applied-at"
+echo "proxmox_lxc" > "$BASE_DIR/terraform-module"
+echo "sha256:$(sha256sum "$0" | cut -d' ' -f1 || echo 'unknown')" > "$BASE_DIR/checksum"
+
+echo "========================================================================"
+echo "           Debian 13 LXC baseline v$BASELINE_VERSION applied successfully!"
+echo "========================================================================"

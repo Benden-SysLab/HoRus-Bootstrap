@@ -1,0 +1,53 @@
+# ==============================================================================
+# ПРИМЕР СЕКРЕТОВ И НАСТРОЕК ДЛЯ ПЛАТФОРМЫ HORUS (PRODUCTION-GRADE SRE МОДЕЛЬ)
+# ==============================================================================
+
+# 1. Параметры API Proxmox VE
+pmx_api_url  = "https://192.168.1.210:8006/api2/json"
+pmx_username = "root@pam"
+pmx_password = "YOUR_PROXMOX_PASSWORD_HERE" # Замените на реальный пароль перед запуском
+
+# 2. Сетевые настройки и DNS по умолчанию
+gateway_ip  = "192.168.1.1"
+vlan_id     = 0 # По умолчанию homelab режим без тегирования VLAN (vmbr0)
+dns_servers = [
+  "192.168.1.1", # Основной DNS сервер (например, шлюз/Кинетик)
+  "8.8.8.8"      # Резервный DNS Google
+]
+
+# 3. Настройки хранилищ
+ssd_storage         = "storage-work" # NFS-хранилище под базы данных, Vault и рабочие данные
+cloudinit_datastore = "local-lvm"    # Хранилище в Proxmox под корневые диски VM/LXC
+
+# 4. SSH Ключи
+# Публичный SSH ключ, который будет прописан во все LXC контейнеры и ВМ
+ssh_public_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI_YOUR_PUBLIC_KEY_HERE user@domain"
+
+# Приватный SSH-ключ для беспарольного доступа (используется baseline провиженером)
+ssh_private_key = <<-EOT
+-----BEGIN OPENSSH PRIVATE KEY-----
+YOUR_OPENSSH_PRIVATE_KEY_HERE
+-----END OPENSSH PRIVATE KEY-----
+EOT
+
+# 5. Параметры доступа к гипервизору Proxmox для автоматического применения Baseline
+# Если не заданы, провиженер будет использовать target_node, root_password и ssh_private_key соответственно
+proxmox_ssh_host        = "" # Оставьте пустым, чтобы подключаться напрямую к target_node
+proxmox_ssh_password    = "" # Оставьте пустым для использования root_password
+proxmox_ssh_private_key = <<-EOT
+-----BEGIN OPENSSH PRIVATE KEY-----
+# Приватный SSH-ключ для подключения к гипервизору Proxmox VE (если отличается от ssh_private_key)
+-----END OPENSSH PRIVATE KEY-----
+EOT
+
+# 6. Версионирование базового слоя совместимости и транспорта доставки
+baseline_version    = "1.0"
+bootstrap_transport = "pct" # Способ доставки baseline: "pct" (native через хост Proxmox) или "ssh" (напрямую в LXC)
+
+# Карта соответствия имен нод Proxmox их реальным IP-адресам для беспрепятственного SSH-подключения
+proxmox_nodes = {
+  "horus-pmx-node01" = "192.168.1.210"
+  "horus-pmx-node02" = "192.168.1.220"
+  "horus-pmx-node03" = "192.168.1.230"
+  "horus-pmx-node04" = "192.168.1.240"
+}

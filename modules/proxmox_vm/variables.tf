@@ -17,6 +17,18 @@ variable "disk_size" {
   default = "32"
 }
 
+variable "root_storage" {
+  type        = string
+  default     = "local-lvm"
+  description = "Target datastore ID for the root filesystem"
+}
+
+variable "bridge" {
+  type        = string
+  default     = "vmbr0"
+  description = "Network bridge interface"
+}
+
 variable "vlan_id"     { type = number }
 variable "ip_address"  { type = string }
 variable "gateway"     { type = string }
@@ -28,6 +40,23 @@ variable "clone_template_id" {
 
 variable "ssh_public_key" { type = string }
 
+variable "factory_node" {
+  type        = string
+  default     = "horus-pmx-node03"
+  description = "Единственная родильная нода (Factory Node) для клонирования базовых VM cloud-images"
+}
+
+variable "additional_disks" {
+  type = list(object({
+    datastore  = string
+    interface  = string
+    size       = string
+    mount_type = string
+  }))
+  default     = []
+  description = "Дополнительные диски для постоянных данных ВМ"
+}
+
 variable "dns_servers" {
   type        = list(string)
   description = "List of DNS servers for the VM"
@@ -38,16 +67,4 @@ variable "root_password" {
   type        = string
   sensitive   = true
   description = "Пароль суперпользователя root для ВМ"
-}
-
-variable "mac_address" {
-  type        = string
-  description = "Фиксированный MAC-адрес ВМ. Если не задан, вычисляется автоматически на основе VMID."
-  default     = null
-}
-
-variable "disk_file_format" {
-  type        = string
-  default     = "raw"
-  description = "Формат файла диска ВМ (например, raw или qcow2)"
 }

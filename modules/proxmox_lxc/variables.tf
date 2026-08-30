@@ -12,29 +12,21 @@ variable "memory" {
   default = 512
 }
 
-# Ресурсы и ограничения
-variable "cpu_units" {
-  type    = number
-  default = 1024
+variable "disk_size" {
+  type    = string
+  default = 8
 }
 
-variable "cpu_limit" {
-  type    = number
-  default = 0
+variable "root_storage" {
+  type        = string
+  default     = "local-lvm"
+  description = "Target datastore ID for the root filesystem"
 }
 
-variable "swap" {
-  type    = number
-  default = 512
-}
-
-variable "rootfs_disk" {
-  type = object({
-    datastore_id = optional(string, "local")
-    size         = optional(string, "8")
-  })
-  default = {}
-  description = "Настройки корневого диска"
+variable "bridge" {
+  type        = string
+  default     = "vmbr0"
+  description = "Network bridge interface"
 }
 
 variable "vlan_id"     { type = number }
@@ -42,70 +34,89 @@ variable "ip_address"  { type = string } # В формате 192.168.X.Y/24
 variable "gateway"     { type = string }
 
 variable "ostemplate" {
-  type    = string
-  default = "infra:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+  type        = string
+  default     = "storage-infra:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
+  description = "Path/ID to LXC template file"
+
+  validation {
+    condition     = can(regex("^.*:vztmpl/.*\\.tar\\.(zst|gz|xz)$", var.ostemplate))
+    error_message = "LXC ostemplate must be a valid Proxmox LXC template tarball (e.g. storage-infra:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst) and NOT a VM template."
+  }
 }
 
 variable "ssh_public_key" { type = string }
 
 variable "additional_mounts" {
   type = list(object({
-    datastore = string  # Имя хранилища в Proxmox (например, "media")
-    mp        = string  # Точка монтирования внутри контейнера (например, "/mnt/storage")
-    size      = string  # Размер (например, "500G")
+    mount_type   = string           # "bind_mount" или "dedicated_volume"
+    volume       = string           # Абсолютный путь хоста (например, "/mnt/pve/storage-media") или Proxmox storage ID (например, "storage-work")
+    mp           = string           # Точка монтирования внутри контейнера (например, "/storage/media")
+    size         = optional(string) # Размер диска для dedicated_volume (или null для bind_mount)
+    storage_name = optional(string) # Имя хранилища в Proxmox для валидации топологии
   }))
-  default = []
+  default     = []
+  description = "Список точек монтирования для LXC контейнера"
 }
 
 variable "dns_servers" {
   type        = list(string)
+  description = "List of DNS servers for the LXC container"
   default     = ["192.168.1.1", "8.8.8.8"]
 }
 
 variable "root_password" {
   type        = string
   sensitive   = true
+  description = "Пароль суперпользователя root для LXC"
 }
 
-variable "mac_address" {
+variable "feature_profile" {
   type        = string
-  default     = null
+  default     = "standard"
+  description = "Профиль возможностей контейнера (standard, docker, system, storage)"
 }
 
-# Функционал контейнера
-variable "container_features" {
-  type = object({
-    nesting = optional(bool, false)
-    keyctl  = optional(bool, false)
-    fuse    = optional(bool, false)
-    mount   = optional(list(string), [])
-    mknod   = optional(bool, false)
-  })
-  default     = {}
-  description = "Дополнительные фичи (nesting, keyctl, fuse, и т.д.)"
+variable "bootstrap_transport" {
+  type        = string
+  default     = "none"
+  description = "Способ доставки bootstrap скрипта: none, ssh, pct"
 }
 
-variable "unprivileged" {
-  type    = bool
-  default = true
-  description = "Является ли контейнер безпривилегированным"
+variable "baseline_version" {
+  type        = string
+  default     = "1.0.0"
+  description = "Версия конфигурационного baseline для Debian 13 LXC"
 }
 
-variable "startup" {
-  type = object({
-    order    = optional(number, 30)
-    up_delay = optional(number, 15)
-    down_delay = optional(number, 15)
-  })
-  default = {}
+variable "timezone" {
+  type        = string
+  default     = "Europe/Moscow"
+  description = "Часовой пояс системы"
 }
 
-variable "tags" {
-  type    = list(string)
-  default = []
+variable "ssh_private_key" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Приватный SSH ключ для аутентификации"
 }
 
-variable "protection" {
-  type    = bool
-  default = false
+variable "proxmox_ssh_host" {
+  type        = string
+  default     = ""
+  description = "IP/Hostname ноды Proxmox для pct push"
+}
+
+variable "proxmox_ssh_private_key" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Приватный SSH ключ Proxmox хоста"
+}
+
+variable "proxmox_ssh_password" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "Пароль Proxmox хоста"
 }
