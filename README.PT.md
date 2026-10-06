@@ -8,6 +8,8 @@ Referência completa: [README.md](README.md). Arquitetura detalhada:
 [ARCHITECTURE.md](ARCHITECTURE.md). Topologia autoritativa:
 [`topology.tf`](topology.tf).
 
+Endereços de management e workloads, CIDRs e gateways de VLAN, endpoints NFS e caminhos físicos específicos do ambiente são fornecidos somente pelo `terraform.tfvars` ignorado.
+
 ## Estado
 
 A topologia atual foi implantada e está convergida. Após o bootstrap,
@@ -38,29 +40,29 @@ de dados nos guests e mounts NFS dentro dos guests.
 
 | Nó | Management | Hardware | Função |
 |---|---|---|---|
-| `horus-pmx-node01` | `192.0.2.11` | Xeon E3-1275v2, ~31 GiB RAM | Guardian/segurança, CI, balanceamento, mídia, worker Kubernetes |
-| `horus-pmx-node02` | `192.0.2.12` | Xeon E3-1275v2, ~31 GiB RAM, RTX 3060 12 GB | Mimir AI, Ansible, Authentik, Joyfilm, Kubernetes |
-| `horus-pmx-node03` | `192.0.2.13` | i7-3770K, ~15,6 GiB RAM | storage, Golden factory, infraestrutura central |
-| `horus-pmx-node04` | `192.0.2.14` | i5-4210U, ~15,5 GiB RAM | observabilidade, System Guardian |
+| `horus-pmx-node01` | `private` | Xeon E3-1275v2, ~31 GiB RAM | Guardian/segurança, CI, balanceamento, mídia, worker Kubernetes |
+| `horus-pmx-node02` | `private` | Xeon E3-1275v2, ~31 GiB RAM, RTX 3060 12 GB | Mimir AI, Ansible, Authentik, Joyfilm, Kubernetes |
+| `horus-pmx-node03` | `private` | i7-3770K, ~15,6 GiB RAM | storage, Golden factory, infraestrutura central |
+| `horus-pmx-node04` | `private` | i5-4210U, ~15,5 GiB RAM | observabilidade, System Guardian |
 
-Rede de management: `192.0.2.0/24`, gateway `192.0.2.1`. Todos os workloads
+Rede de management: `private`, gateway `private`. Todos os workloads
 usam `vmbr0`.
 
 ## Rede
 
 | VLAN | Nome | Sub-rede | Gateway |
 |---:|---|---|---|
-| 101 | INFRA | `198.51.100.0/28` | `198.51.100.1` |
-| 110 | TRUSTED | `198.51.100.16/28` | `198.51.100.17` |
-| 120 | IOT | `198.51.100.32/28` | `198.51.100.33` |
-| 130 | QUARANTINE | `198.51.100.48/28` | `198.51.100.49` |
-| 140 | STORAGE | `198.51.100.64/28` | `198.51.100.65` |
-| 150 | OBS/SEC | `198.51.100.80/28` | `198.51.100.81` |
-| 160 | AI | `198.51.100.96/28` | `198.51.100.97` |
-| 170 | DMZ | `198.51.100.112/28` | `198.51.100.113` |
-| 180 | K8S-LAB | `198.51.100.128/28` | `198.51.100.129` |
+| 101 | INFRA | `private` | `private` |
+| 110 | TRUSTED | `private` | `private` |
+| 120 | IOT | `private` | `private` |
+| 130 | QUARANTINE | `private` | `private` |
+| 140 | STORAGE | `private` | `private` |
+| 150 | OBS/SEC | `private` | `private` |
+| 160 | AI | `private` | `private` |
+| 170 | DMZ | `private` | `private` |
+| 180 | K8S-LAB | `private` | `private` |
 
-Kubernetes: Pod CIDR `198.51.100.0/24`, Service CIDR `203.0.113.0/24`.
+Kubernetes: Pod CIDR `private`, Service CIDR `private`.
 
 ## Inventário de workloads
 

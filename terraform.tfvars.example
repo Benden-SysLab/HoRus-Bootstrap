@@ -1,9 +1,93 @@
-# Proxmox API authentication. Prefer an API token with the permissions required
-# for guest and storage management; never commit real credentials.
-pmx_api_url   = "https://192.0.2.11:8006/api2/json"
+# Documentation-only values from RFC 5737 ranges. Copy this file to the
+# ignored terraform.tfvars and replace every environment coordinate locally.
+pmx_api_url   = "https://192.0.2.10:8006/api2/json"
 pmx_api_token = "root@pam!terraform=REDACTED"
 
-dns_servers = ["198.51.100.1", "1.1.1.1"]
+environment = {
+  management = {
+    cidr    = "192.0.2.0/24"
+    gateway = "192.0.2.1"
+    nodes = {
+      horus-pmx-node01 = "192.0.2.11"
+      horus-pmx-node02 = "192.0.2.12"
+      horus-pmx-node03 = "192.0.2.13"
+      horus-pmx-node04 = "192.0.2.14"
+    }
+  }
+
+  vlan_networks = {
+    "101" = { cidr = "198.51.100.0/28", gateway = "198.51.100.1" }
+    "110" = { cidr = "198.51.100.16/28", gateway = "198.51.100.17" }
+    "120" = { cidr = "198.51.100.32/28", gateway = "198.51.100.33" }
+    "130" = { cidr = "198.51.100.48/28", gateway = "198.51.100.49" }
+    "140" = { cidr = "198.51.100.64/28", gateway = "198.51.100.65" }
+    "150" = { cidr = "198.51.100.80/28", gateway = "198.51.100.81" }
+    "160" = { cidr = "198.51.100.96/28", gateway = "198.51.100.97" }
+    "170" = { cidr = "198.51.100.112/28", gateway = "198.51.100.113" }
+    "180" = { cidr = "198.51.100.128/28", gateway = "198.51.100.129" }
+  }
+
+  workload_ips = {
+    horus-lb-srv01 = "198.51.100.114/28"
+    horus-agent-srv01 = "198.51.100.2/28"
+    horus-jnk-srv01 = "198.51.100.3/28"
+    horus-ai-srv01 = "198.51.100.82/28"
+    horus-db-srv01 = "198.51.100.83/28"
+    horus-media-srv01 = "198.51.100.4/28"
+    horus-k8sw-srv01 = "198.51.100.130/28"
+    horus-ans-srv01 = "198.51.100.5/28"
+    horus-ai-srv02 = "198.51.100.98/28"
+    horus-db-srv02 = "198.51.100.99/28"
+    horus-vec-srv01 = "198.51.100.100/28"
+    horus-cache-srv01 = "198.51.100.101/28"
+    horus-iam-srv01 = "198.51.100.6/28"
+    horus-media-srv02 = "198.51.100.7/28"
+    horus-k8sw-srv02 = "198.51.100.131/28"
+    horus-k8sc-srv01 = "198.51.100.132/28"
+    horus-db-srv03 = "198.51.100.8/28"
+    horus-vlt-srv01 = "198.51.100.9/28"
+    horus-wiki-srv01 = "198.51.100.10/28"
+    horus-git-srv01 = "198.51.100.11/28"
+    horus-work-srv01 = "198.51.100.12/28"
+    horus-reg-srv01 = "198.51.100.13/28"
+    horus-grf-srv01 = "198.51.100.84/28"
+    horus-pm-srv01 = "198.51.100.85/28"
+    horus-lok-srv01 = "198.51.100.86/28"
+    horus-otel-srv01 = "198.51.100.87/28"
+    horus-s3-srv01 = "198.51.100.88/28"
+    horus-ai-srv03 = "198.51.100.89/28"
+  }
+
+  dns_servers = ["198.51.100.1", "203.0.113.53"]
+
+  storage_paths = {
+    guardian-data = "/srv/example/guardian-data"
+    mimir-data    = "/srv/example/mimir-data"
+    infra         = "/srv/example/infra"
+    artifacts     = "/srv/example/artifacts"
+    logs          = "/srv/example/logs"
+    media         = "/srv/example/media"
+  }
+
+  guest_paths = {
+    artifacts-shared   = "/data/example/artifacts"
+    guardian-data      = "/data/example/guardian-data"
+    media              = "/data/example/media"
+    mimir-data         = "/data/example/mimir-data"
+    mimir-postgres     = "/data/example/mimir-data/postgres"
+    mimir-vectors      = "/data/example/mimir-data/vectors"
+    infra-postgres     = "/data/example/infra/postgres"
+    infra-wiki         = "/data/example/infra/wiki"
+    infra-gitea        = "/data/example/infra/gitea"
+    artifacts-registry = "/data/example/artifacts/registry"
+    logs               = "/data/example/logs"
+  }
+
+  nfs = {
+    media     = { server = "192.0.2.13", export = "/srv/example/media" }
+    artifacts = { server = "192.0.2.13", export = "/srv/example/artifacts/builds" }
+  }
+}
 
 # File path only; never place private-key content in Terraform variables/state.
 bootstrap_ssh_key_path = "C:/example/keys/proxmox_ed25519"

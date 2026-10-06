@@ -13,6 +13,13 @@ resource "proxmox_storage_directory" "private" {
   disable          = false
   create_base_path = false
   create_subdirs   = true
+
+  lifecycle {
+    precondition {
+      condition     = local.environment_coordinates_valid
+      error_message = "Environment coordinates are inconsistent: management/workload addresses or gateways do not match their configured networks."
+    }
+  }
 }
 
 module "lxc_containers" {
@@ -33,7 +40,7 @@ module "lxc_containers" {
   vlan_id           = each.value.vlan_id
   ip_address        = each.value.ip_address
   gateway           = local.vlans[tostring(each.value.vlan_id)].gateway
-  dns_servers       = var.dns_servers
+  dns_servers       = var.environment.dns_servers
   feature_profile   = try(each.value.feature_profile, "standard")
   private_mounts = [for mount in try(each.value.private_mounts, []) : {
     datastore_id = local.storage_inventory[mount.storage_name].datastore_id
@@ -63,5 +70,5 @@ module "virtual_machines" {
   vlan_id           = each.value.vlan_id
   ip_address        = each.value.ip_address
   gateway           = local.vlans[tostring(each.value.vlan_id)].gateway
-  dns_servers       = var.dns_servers
+  dns_servers       = var.environment.dns_servers
 }

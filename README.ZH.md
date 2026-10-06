@@ -6,6 +6,8 @@
 完整参考：[README.md](README.md)。详细架构：[ARCHITECTURE.md](ARCHITECTURE.md)。
 权威拓扑：[`topology.tf`](topology.tf)。
 
+环境特定的 management/workload 地址、VLAN CIDR 与 gateway、NFS endpoint 和物理路径仅通过被忽略的 `terraform.tfvars` 提供。
+
 ## 状态
 
 当前拓扑已成功部署并达到收敛状态。Bootstrap 完成后，
@@ -35,29 +37,29 @@ Terraform 管理基础设施标识和放置。后续 Ansible/服务层管理 gue
 
 | 节点 | Management | 硬件 | 主要角色 |
 |---|---|---|---|
-| `horus-pmx-node01` | `192.0.2.11` | Xeon E3-1275v2，约 31 GiB RAM | Guardian/security、CI、负载均衡、media、Kubernetes worker |
-| `horus-pmx-node02` | `192.0.2.12` | Xeon E3-1275v2，约 31 GiB RAM，RTX 3060 12 GB | Mimir AI、Ansible、Authentik、Joyfilm、Kubernetes |
-| `horus-pmx-node03` | `192.0.2.13` | i7-3770K，约 15.6 GiB RAM | storage、Golden factory、核心基础设施 |
-| `horus-pmx-node04` | `192.0.2.14` | i5-4210U，约 15.5 GiB RAM | observability、System Guardian |
+| `horus-pmx-node01` | `private` | Xeon E3-1275v2，约 31 GiB RAM | Guardian/security、CI、负载均衡、media、Kubernetes worker |
+| `horus-pmx-node02` | `private` | Xeon E3-1275v2，约 31 GiB RAM，RTX 3060 12 GB | Mimir AI、Ansible、Authentik、Joyfilm、Kubernetes |
+| `horus-pmx-node03` | `private` | i7-3770K，约 15.6 GiB RAM | storage、Golden factory、核心基础设施 |
+| `horus-pmx-node04` | `private` | i5-4210U，约 15.5 GiB RAM | observability、System Guardian |
 
-Management 网络为 `192.0.2.0/24`，gateway 为 `192.0.2.1`。所有工作负载
+Management 网络为 `private`，gateway 为 `private`。所有工作负载
 使用 `vmbr0`。
 
 ## 网络
 
 | VLAN | 名称 | 子网 | Gateway |
 |---:|---|---|---|
-| 101 | INFRA | `198.51.100.0/28` | `198.51.100.1` |
-| 110 | TRUSTED | `198.51.100.16/28` | `198.51.100.17` |
-| 120 | IOT | `198.51.100.32/28` | `198.51.100.33` |
-| 130 | QUARANTINE | `198.51.100.48/28` | `198.51.100.49` |
-| 140 | STORAGE | `198.51.100.64/28` | `198.51.100.65` |
-| 150 | OBS/SEC | `198.51.100.80/28` | `198.51.100.81` |
-| 160 | AI | `198.51.100.96/28` | `198.51.100.97` |
-| 170 | DMZ | `198.51.100.112/28` | `198.51.100.113` |
-| 180 | K8S-LAB | `198.51.100.128/28` | `198.51.100.129` |
+| 101 | INFRA | `private` | `private` |
+| 110 | TRUSTED | `private` | `private` |
+| 120 | IOT | `private` | `private` |
+| 130 | QUARANTINE | `private` | `private` |
+| 140 | STORAGE | `private` | `private` |
+| 150 | OBS/SEC | `private` | `private` |
+| 160 | AI | `private` | `private` |
+| 170 | DMZ | `private` | `private` |
+| 180 | K8S-LAB | `private` | `private` |
 
-Kubernetes：Pod CIDR `198.51.100.0/24`，Service CIDR `203.0.113.0/24`。
+Kubernetes：Pod CIDR `private`，Service CIDR `private`。
 
 ## 工作负载清单
 

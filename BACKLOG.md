@@ -4,6 +4,10 @@ The four-node Terraform bootstrap, 28-workload inventory, Golden 9000/9001
 model, provider-native VM lifecycle, two-phase LXC placement and idempotent
 steady state are complete.
 
+Real network, NFS and physical-path coordinates are intentionally kept in the
+ignored `terraform.tfvars`; the tracked topology retains the full HoRus
+inventory, placement and logical storage ownership model.
+
 ## Future work
 
 - [ ] Design an optional pool of immutable Golden LXC replicas/clone lanes for

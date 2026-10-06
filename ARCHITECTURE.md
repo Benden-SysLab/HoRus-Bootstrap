@@ -1,5 +1,7 @@
 # HoRus-Bootstrap architecture
 
+Environment-specific management/workload addresses, VLAN CIDRs and gateways, NFS endpoints and physical/guest paths are mandatory inputs supplied through the ignored `terraform.tfvars`. The tracked topology retains identities, placement, VLAN IDs and storage ownership.
+
 ## Design authority
 
 The current working-tree Terraform and the verified deployment are the source
@@ -165,11 +167,11 @@ Proxmox-managed storage-backed LXC mount points on the physical owner node.
 
 | Datastore | Physical owner | Existing root | Consumers |
 |---|---|---|---|
-| `guardian-data` | Node01 | `/srv/example/guardian-data` | Guardian PostgreSQL |
-| `mimir-data` | Node02 | `/srv/example/mimir-data` | Mimir, AI PostgreSQL, Qdrant |
-| `storage-infra` | Node03 | `/srv/example/infra` | infrastructure PostgreSQL, Wiki, Gitea; also Golden 9001 clone storage |
-| `artifacts-data` | Node03 | `/srv/example/artifacts` | OCI Registry |
-| `logs-data` | Node04 | `/srv/example/logs` | MinIO |
+| `guardian-data` | Node01 | `/private/environment/path` | Guardian PostgreSQL |
+| `mimir-data` | Node02 | `/private/environment/path` | Mimir, AI PostgreSQL, Qdrant |
+| `storage-infra` | Node03 | `/private/environment/path` | infrastructure PostgreSQL, Wiki, Gitea; also Golden 9001 clone storage |
+| `artifacts-data` | Node03 | `/private/environment/path` | OCI Registry |
+| `logs-data` | Node04 | `/private/environment/path` | MinIO |
 
 Terraform sets `create_base_path = false` for managed directory storages, so a
 missing physical mount is not silently replaced by an ordinary directory.
@@ -186,13 +188,13 @@ in [RESOURCE_PLAN.md](RESOURCE_PLAN.md); sizes are not silently reduced.
 
 ## Network segmentation
 
-Management uses `192.0.2.0/24` with gateway `192.0.2.1`. Workload traffic is
+Management uses `private` with gateway `private`. Workload traffic is
 segmented across VLANs 101, 110, 120, 130, 140, 150, 160, 170 and 180 on
 `vmbr0`. Each workload's IP must belong to the selected VLAN subnet, and its
 gateway is derived from the same central map. Terraform checks these invariants.
 
-Kubernetes reserves Pod CIDR `198.51.100.0/24` and Service CIDR
-`203.0.113.0/24`.
+Kubernetes Pod and Service CIDRs are environment-specific and intentionally
+not published here.
 
 ## Security model
 

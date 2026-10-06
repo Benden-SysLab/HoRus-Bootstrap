@@ -15,9 +15,9 @@ variables {
   root_storage = "local-lvm"
   bridge       = "vmbr0"
   vlan_id      = 101
-  ip_address   = "198.51.100.3/24"
+  ip_address   = "198.51.100.3/28"
   gateway      = "198.51.100.1"
-  dns_servers  = ["198.51.100.1"]
+  dns_servers  = ["203.0.113.53"]
 }
 
 run "provider_native_vm_clone" {

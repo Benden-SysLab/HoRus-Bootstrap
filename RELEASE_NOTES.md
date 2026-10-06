@@ -1,11 +1,11 @@
-# HoRus-Bootstrap v2.0.0 — draft release notes
+# HoRus-Bootstrap v2.0.0
 
-Proposed release: `v2.0.0`.
+Published release: `v2.0.0`.
 
-No repository tags currently exist. A major version is appropriate because the
-bootstrap now represents a new four-node topology, a new authoritative workload
-inventory and a materially different VM/LXC provisioning lifecycle. This file
-is preparation only; no tag or GitHub release has been created.
+This major version represents the rebuilt four-node topology, the authoritative
+workload inventory and a materially different VM/LXC provisioning lifecycle.
+Environment-specific addresses, network coordinates, NFS endpoints and physical
+paths are local inputs supplied through the ignored `terraform.tfvars`.
 
 ## Highlights
 
@@ -57,6 +57,8 @@ this release.
 - Gateways are derived per VLAN; no single gateway applies to all workloads.
 - Private application state is modeled separately from shared media/artifact
   datasets.
+- Real environment coordinates are mandatory private inputs; the tracked
+  example uses only documentation ranges and neutral paths.
 
 Review Terraform plans and migration impact before adopting this release over
 an older deployment. Golden templates and physical storage mounts remain

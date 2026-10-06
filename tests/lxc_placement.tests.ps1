@@ -11,8 +11,8 @@ function New-Fixture {
   $spec = @{
     vmid = 405; hostname = 'horus-s3-srv01'; template_vmid = 9001
     target_node = 'horus-pmx-node04'; root_storage = 'local-lvm'; disk_size = 16
-    bridge = 'vmbr0'; vlan_id = 150; ip_address = '198.51.100.88/24'; gateway = '198.51.100.81'
-    private_mounts = @(@{ datastore_id = 'logs-data'; path = '/srv/example/logs'; size = '0' })
+    bridge = 'vmbr0'; vlan_id = 150; ip_address = '198.51.100.88/28'; gateway = '198.51.100.81'
+    private_mounts = @(@{ datastore_id = 'logs-data'; path = '/data/example/logs'; size = '0' })
     features = @{ nesting = $true; keyctl = $true; fuse = $true; mknod = $false; mount = @('nfs', 'cifs') }
     allow_shutdown = $false; start_on_boot = $true
   }
@@ -21,9 +21,9 @@ function New-Fixture {
     Config = @{
       hostname = $spec.hostname; unprivileged = 1; onboot = 1
       rootfs = 'storage-infra:vm-405-disk-0,size=8G'
-      net0 = 'name=eth0,bridge=vmbr0,ip=198.51.100.88/24,gw=198.51.100.81,tag=150'
+      net0 = 'name=eth0,bridge=vmbr0,ip=198.51.100.88/28,gw=198.51.100.81,tag=150'
       features = 'nesting=1,keyctl=1,fuse=1,mknod=0,mount=nfs;cifs'
-      mp0 = 'logs-data:vm-405-disk-0,mp=/srv/example/logs,size=0'
+      mp0 = 'logs-data:vm-405-disk-0,mp=/data/example/logs,size=0'
     }
     Commands = [System.Collections.Generic.List[string]]::new()
   }

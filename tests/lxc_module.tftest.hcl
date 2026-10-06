@@ -14,14 +14,14 @@ variables {
   root_storage           = "local-lvm"
   bridge                 = "vmbr0"
   vlan_id                = 150
-  ip_address             = "198.51.100.88/24"
+  ip_address             = "198.51.100.88/28"
   gateway                = "198.51.100.81"
-  dns_servers            = ["198.51.100.1"]
+  dns_servers            = ["203.0.113.53"]
   feature_profile        = "storage"
   bootstrap_ssh_key_path = "C:/test/key"
   private_mounts = [{
     datastore_id = "logs-data"
-    path         = "/srv/example/logs"
+    path         = "/data/example/logs"
     size         = "0"
   }]
 }
@@ -41,7 +41,7 @@ run "two_phase_final_node_clone_and_managed_private_volume" {
     error_message = "Provider must leave LXC stopped for placement while declaring final local-lvm/size and autostart."
   }
   assert {
-    condition     = proxmox_virtual_environment_container.lxc_node.mount_point[0].volume == "logs-data" && proxmox_virtual_environment_container.lxc_node.mount_point[0].size == "0T" && proxmox_virtual_environment_container.lxc_node.mount_point[0].path == "/srv/example/logs"
+    condition     = proxmox_virtual_environment_container.lxc_node.mount_point[0].volume == "logs-data" && proxmox_virtual_environment_container.lxc_node.mount_point[0].size == "0T" && proxmox_virtual_environment_container.lxc_node.mount_point[0].path == "/data/example/logs"
     error_message = "Private state must use a Proxmox-managed directory volume with canonical zero-size representation."
   }
   assert {
