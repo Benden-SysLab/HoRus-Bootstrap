@@ -1,9 +1,25 @@
-### 📋 Бэклог проекта HoRus-Bootstrap
+# HoRus-Bootstrap backlog
 
-- [x] Приведение топологии к 4-нодовому кластеру Proxmox VE (28 workloads: 21 LXC, 7 VM)
-- [x] Golden LXC 9001: stopped clone to final node/shared storage-infra, then same-node rootfs move to local-lvm
-- [ ] Provider-level keyed mutex for Golden 9001 clone operations (required for one-shot bulk apply with parallelism 5)
-- [ ] Optional Golden replica/clone-lane design; no VMID 9002+ without explicit approval
-- [x] Жизненный цикл ВМ через Full Clone Golden VM 9000 на Factory Node (`horus-pmx-node03`)
-- [ ] Реализация guest-level NFS mounts из Terraform metadata в Ansible
-- [ ] Capacity decision для local-lvm overcommit Node02/03/04
+The four-node Terraform bootstrap, 28-workload inventory, Golden 9000/9001
+model, provider-native VM lifecycle, two-phase LXC placement and idempotent
+steady state are complete.
+
+## Future work
+
+- [ ] Design an optional pool of immutable Golden LXC replicas/clone lanes for
+  parallel first bootstrap. Additional template VMIDs require explicit
+  approval and are not part of the current topology.
+- [ ] Implement the Ansible/service layer for packages, services, application
+  users, data ownership and guest-level NFS mounts derived from Terraform
+  metadata.
+- [ ] Review long-term `local-lvm` capacity for the accepted thin-provisioning
+  overcommit on Node02, Node03 and Node04; do not reduce approved workload sizes
+  silently.
+- [ ] Add CI execution for formatting, validation, Terraform tests and offline
+  placement tests when a suitable secret-free runner workflow is approved.
+
+## Explicitly out of scope
+
+- Application configuration inside workloads.
+- Automatic creation of external Golden templates 9000/9001.
+- Unapproved Golden replicas or hidden clone retry/scheduler logic.
