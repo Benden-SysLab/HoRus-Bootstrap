@@ -1,67 +1,67 @@
-# ==============================================================================
-# ЛОКАЛЬНОЕ ХРАНЕНИЕ СЕКРЕТОВ (Исключено из репозитория через .gitignore)
-# ==============================================================================
+# Existing ext4 roots were verified read-only on their physical owners before
+# declaring these storages. create_base_path=false prevents Terraform from
+# fabricating a missing physical mount; Proxmox only creates its normal volume
+# subdirectories beneath an already-present root.
+resource "proxmox_storage_directory" "private" {
+  for_each = local.managed_private_storages
 
-locals {
-  # Считываем root-пароль из локального файла root_password.txt, который добавлен в .gitignore.
-  # Функция trimspace удаляет случайные переводы строк или пробелы.
-  root_password = trimspace(file("${path.module}/root_password.txt"))
+  id               = each.value.datastore_id
+  path             = each.value.physical_path
+  nodes            = [each.value.physical_owner]
+  content          = ["rootdir"]
+  shared           = false
+  disable          = false
+  create_base_path = false
+  create_subdirs   = true
 }
-
-# ==============================================================================
-# PROXMOX LXC CONTAINERS (Direct LXC Template Provisioning)
-# ==============================================================================
 
 module "lxc_containers" {
-  for_each = {
-    for k, v in local.workloads : k => v if v.type == "lxc"
-  }
+  for_each = local.lxc_workloads
+  source   = "./modules/proxmox_lxc"
 
-  source            = "./modules/proxmox_lxc"
   target_node       = each.value.target_node
   vmid              = each.value.vmid
   hostname          = each.value.hostname
   cores             = each.value.cores
   memory            = each.value.memory
-  disk_size         = try(each.value.disk_size, "32")
-  root_storage      = try(each.value.root_storage, "local-lvm")
-  bridge            = try(each.value.bridge, "vmbr0")
-  vlan_id           = try(each.value.vlan_id, 0)
+  disk_size         = each.value.disk_size
+  root_storage      = local.target_root_datastore
+  clone_node        = local.lxc_template.node_name
+  clone_template_id = local.lxc_template.vm_id
+  clone_storage     = local.lxc_template.datastore_id
+  bridge            = "vmbr0"
+  vlan_id           = each.value.vlan_id
   ip_address        = each.value.ip_address
-  gateway           = var.gateway_ip
+  gateway           = local.vlans[tostring(each.value.vlan_id)].gateway
   dns_servers       = var.dns_servers
-  ssh_public_key    = var.ssh_public_key
-  root_password     = local.root_password
-  ostemplate        = try(each.value.image_source, local.lxc_template_file_id)
   feature_profile   = try(each.value.feature_profile, "standard")
-  additional_mounts = try(each.value.additional_mounts, [])
+  private_mounts = [for mount in try(each.value.private_mounts, []) : {
+    datastore_id = local.storage_inventory[mount.storage_name].datastore_id
+    path         = mount.path
+    size         = mount.size
+  }]
+  bootstrap_ssh_key_path = var.bootstrap_ssh_key_path
+  allow_lxc_shutdown     = var.allow_lxc_shutdown
+
+  depends_on = [proxmox_storage_directory.private]
 }
 
-# ==============================================================================
-# PROXMOX VIRTUAL MACHINES (Golden VM 9000 Clone Provisioning)
-# ==============================================================================
-
 module "virtual_machines" {
-  for_each = {
-    for k, v in local.workloads : k => v if v.type == "vm"
-  }
+  for_each = local.vm_workloads
+  source   = "./modules/proxmox_vm"
 
-  source            = "./modules/proxmox_vm"
   target_node       = each.value.target_node
-  factory_node      = try(each.value.factory_node, "horus-pmx-node03")
+  factory_node      = local.vm_template.node_name
+  clone_template_id = local.vm_template.vm_id
   vmid              = each.value.vmid
   hostname          = each.value.hostname
   cores             = each.value.cores
   memory            = each.value.memory
-  disk_size         = try(each.value.disk_size, "32")
-  root_storage      = try(each.value.root_storage, "local-lvm")
-  bridge            = try(each.value.bridge, "vmbr0")
-  vlan_id           = try(each.value.vlan_id, 0)
+  disk_size         = each.value.disk_size
+  root_storage      = local.target_root_datastore
+  bridge            = "vmbr0"
+  vlan_id           = each.value.vlan_id
   ip_address        = each.value.ip_address
-  gateway           = var.gateway_ip
+  gateway           = local.vlans[tostring(each.value.vlan_id)].gateway
   dns_servers       = var.dns_servers
-  ssh_public_key    = var.ssh_public_key
-  root_password     = local.root_password
-  clone_template_id = try(each.value.clone_template_id, 9000)
-  additional_disks  = try(each.value.additional_disks, [])
 }

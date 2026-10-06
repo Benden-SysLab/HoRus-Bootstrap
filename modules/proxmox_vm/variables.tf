@@ -1,70 +1,26 @@
 variable "target_node" { type = string }
-variable "vmid"        { type = number }
-variable "hostname"    { type = string }
-
-variable "cores" {
-  type    = number
-  default = 2
-}
-
-variable "memory" {
-  type    = number
-  default = 2048
-}
+variable "factory_node" { type = string }
+variable "vmid" { type = number }
+variable "hostname" { type = string }
+variable "cores" { type = number }
+variable "memory" { type = number }
 
 variable "disk_size" {
-  type    = string
-  default = "32"
+  type = string
+  validation {
+    condition     = try(tonumber(var.disk_size) >= 12, false)
+    error_message = "Golden VM 9000 has a 12 GiB root disk; VM root disks cannot be smaller."
+  }
 }
 
-variable "root_storage" {
-  type        = string
-  default     = "local-lvm"
-  description = "Target datastore ID for the root filesystem"
-}
-
-variable "bridge" {
-  type        = string
-  default     = "vmbr0"
-  description = "Network bridge interface"
-}
-
-variable "vlan_id"     { type = number }
-variable "ip_address"  { type = string }
-variable "gateway"     { type = string }
+variable "root_storage" { type = string }
+variable "bridge" { type = string }
+variable "vlan_id" { type = number }
+variable "ip_address" { type = string }
+variable "gateway" { type = string }
+variable "dns_servers" { type = list(string) }
 
 variable "clone_template_id" {
   type    = number
   default = 9000
-}
-
-variable "ssh_public_key" { type = string }
-
-variable "factory_node" {
-  type        = string
-  default     = "horus-pmx-node03"
-  description = "Единственная родильная нода (Factory Node) для клонирования базовых VM cloud-images"
-}
-
-variable "additional_disks" {
-  type = list(object({
-    datastore  = string
-    interface  = string
-    size       = string
-    mount_type = string
-  }))
-  default     = []
-  description = "Дополнительные диски для постоянных данных ВМ"
-}
-
-variable "dns_servers" {
-  type        = list(string)
-  description = "List of DNS servers for the VM"
-  default     = ["203.0.113.1", "8.8.8.8"]
-}
-
-variable "root_password" {
-  type        = string
-  sensitive   = true
-  description = "Пароль суперпользователя root для ВМ"
 }

@@ -6,31 +6,28 @@ terraform {
   }
 }
 
-locals {
-  # Ищем ID шаблона по имени ноды, если не нашли — берем дефолт
-  chosen_template_id = var.clone_template_id
-}
-
-# Основной блок развертывания ВМ
 resource "proxmox_virtual_environment_vm" "kvm_node" {
   node_name = var.target_node
   vm_id     = var.vmid
   name      = var.hostname
+  migrate   = true
+  started   = true
+  on_boot   = true
 
-  # Включаем поддержку агента со стороны Proxmox
+  purge_on_destroy                     = true
+  delete_unreferenced_disks_on_destroy = true
+
   agent {
     enabled = true
   }
 
-  # Клонирование Golden VM с Factory Node.
-  # Целевое хранилище задается ниже в disk.datastore_id.
   clone {
-    vm_id     = local.chosen_template_id
-    node_name = var.factory_node
-    full      = true
+    vm_id        = var.clone_template_id
+    node_name    = var.factory_node
+    datastore_id = var.root_storage
+    full         = true
   }
 
-  # CPU и память
   cpu {
     cores = var.cores
     type  = "host"
@@ -40,35 +37,20 @@ resource "proxmox_virtual_environment_vm" "kvm_node" {
     dedicated = var.memory
   }
 
-  # Корневой диск
-  # Именно здесь указывается локальное хранилище целевой ноды.
   disk {
     datastore_id = var.root_storage
     interface    = "scsi0"
-    size         = var.disk_size
+    size         = tonumber(var.disk_size)
     file_format  = "raw"
   }
 
-  # Дополнительные диски
-  # Например, persistent data на storage-work для Vault.
-  dynamic "disk" {
-    for_each = var.additional_disks
-
-    content {
-      datastore_id = disk.value.datastore
-      interface    = disk.value.interface
-      size         = disk.value.size
-      file_format  = "raw"
-    }
-  }
-
-  # Сеть
   network_device {
     bridge  = var.bridge
     vlan_id = var.vlan_id
   }
 
-  # Cloud-Init
+  # Golden 9000 already contains the approved users and SSH keys. Cloud-Init
+  # owns only network/DNS here and does not overwrite that security baseline.
   initialization {
     type         = "nocloud"
     datastore_id = var.root_storage
@@ -82,15 +64,6 @@ resource "proxmox_virtual_environment_vm" "kvm_node" {
         address = var.ip_address
         gateway = var.gateway
       }
-    }
-
-    user_account {
-      password = var.root_password
-      keys = [
-        can(file(var.ssh_public_key))
-        ? trimspace(file(var.ssh_public_key))
-        : trimspace(var.ssh_public_key)
-      ]
     }
   }
 }

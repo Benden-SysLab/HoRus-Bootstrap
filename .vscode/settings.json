@@ -1,0 +1,5 @@
+{
+    "terminal.integrated.env.windows": {
+        "NO_PROXY": "192.0.2.0/24,198.51.100.0/24,192.0.2.1"
+    }
+}

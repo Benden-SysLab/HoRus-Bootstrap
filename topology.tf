@@ -1,797 +1,249 @@
-# ==============================================================================
-# DECLARATIVE WORKLOAD INVENTORY & TOPOLOGY VALIDATION
-# ==============================================================================
+# Authoritative HoRus cluster topology. Workloads are declared exactly once.
 
 locals {
-  lxc_template_file_id = "storage-infra:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
+  nodes = {
+    "horus-pmx-node01" = { management_ip = "192.0.2.11", ram_mb = 31785, local_lvm_gib = 130.27 }
+    "horus-pmx-node02" = { management_ip = "192.0.2.12", ram_mb = 31785, local_lvm_gib = 49.34 }
+    "horus-pmx-node03" = { management_ip = "192.0.2.13", ram_mb = 15953, local_lvm_gib = 53.93 }
+    "horus-pmx-node04" = { management_ip = "192.0.2.14", ram_mb = 15912, local_lvm_gib = 53.93 }
+  }
+
+  vlans = {
+    "101" = { name = "INFRA", cidr = "198.51.100.0/28", gateway = "198.51.100.1" }
+    "110" = { name = "TRUSTED", cidr = "198.51.100.16/28", gateway = "198.51.100.17" }
+    "120" = { name = "IOT", cidr = "198.51.100.32/28", gateway = "198.51.100.33" }
+    "130" = { name = "QUARANTINE", cidr = "198.51.100.48/28", gateway = "198.51.100.49" }
+    "140" = { name = "STORAGE", cidr = "198.51.100.64/28", gateway = "198.51.100.65" }
+    "150" = { name = "OBS/SEC", cidr = "198.51.100.80/28", gateway = "198.51.100.81" }
+    "160" = { name = "AI", cidr = "198.51.100.96/28", gateway = "198.51.100.97" }
+    "170" = { name = "DMZ", cidr = "198.51.100.112/28", gateway = "198.51.100.113" }
+    "180" = { name = "K8S-LAB", cidr = "198.51.100.128/28", gateway = "198.51.100.129" }
+  }
+
+  vm_template  = { vm_id = 9000, node_name = "horus-pmx-node03", datastore_id = "local-lvm", root_gib = 12 }
+  lxc_template = { vm_id = 9001, node_name = "horus-pmx-node03", datastore_id = "storage-infra", root_gib = 8 }
+
+  target_root_datastore = "local-lvm"
+
+  # Private storages allocate one Proxmox-managed volume per workload. A size
+  # of 0 creates a managed directory on a directory/NFS backend: no arbitrary
+  # host bind mount and no guessed UID/GID mapping are required.
+  storage_inventory = {
+    "guardian-data" = {
+      category          = "private"
+      datastore_id      = "guardian-data"
+      physical_owner    = "horus-pmx-node01"
+      physical_path     = "/srv/example/guardian-data"
+      terraform_managed = true
+    }
+    "mimir-data" = {
+      category          = "private"
+      datastore_id      = "mimir-data"
+      physical_owner    = "horus-pmx-node02"
+      physical_path     = "/srv/example/mimir-data"
+      terraform_managed = true
+    }
+    "infra-data" = {
+      category          = "private"
+      datastore_id      = "storage-infra"
+      physical_owner    = "horus-pmx-node03"
+      physical_path     = "/srv/example/infra"
+      terraform_managed = false
+    }
+    "artifacts-data" = {
+      category          = "private"
+      datastore_id      = "artifacts-data"
+      physical_owner    = "horus-pmx-node03"
+      physical_path     = "/srv/example/artifacts"
+      terraform_managed = true
+    }
+    "logs-data" = {
+      category          = "private"
+      datastore_id      = "logs-data"
+      physical_owner    = "horus-pmx-node04"
+      physical_path     = "/srv/example/logs"
+      terraform_managed = true
+    }
+    "media" = {
+      category          = "shared"
+      physical_owner    = "horus-pmx-node03"
+      physical_path     = "/srv/example/media"
+      nfs_server        = "192.0.2.13"
+      nfs_export        = "/srv/example/media"
+      allowed_workloads = ["horus-media-srv01", "horus-media-srv02"]
+    }
+    "artifacts" = {
+      category          = "shared"
+      physical_owner    = "horus-pmx-node03"
+      physical_path     = "/srv/example/artifacts"
+      nfs_server        = "192.0.2.13"
+      nfs_export        = "/srv/example/artifacts/builds"
+      allowed_workloads = ["horus-agent-srv01"]
+    }
+  }
 
   workloads = {
-    # --------------------------------------------------------------------------
-    # NODE01 (horus-pmx-node01: 8C / 31.04 GiB RAM - GPU, Compute, Deploy, Media Core, LB)
-    # --------------------------------------------------------------------------
-    "horus-jnk-srv01" = {
-      vmid              = 101
-      hostname          = "horus-jnk-srv01"
-      type              = "vm"
-      target_node       = "horus-pmx-node01"
-      factory_node      = "horus-pmx-node03"
-      cores             = 2
-      memory            = 4096
-      disk_size         = "32"
-      root_storage      = "local-lvm"
-      ip_address        = "203.0.113.211/24"
-      bridge            = "vmbr0"
-      vlan_id           = 0
-      image_source      = "9000"
-      clone_template_id = 9000
-    }
-    "horus-ai-srv01" = {
-      vmid            = 102
-      hostname        = "horus-ai-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node01"
-      cores           = 4
-      memory          = 4096
-      disk_size       = "32"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.212/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-ai-srv02" = {
-      vmid            = 103
-      hostname        = "horus-ai-srv02"
-      type            = "lxc"
-      target_node     = "horus-pmx-node01"
-      cores           = 4
-      memory          = 4096
-      disk_size       = "32"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.213/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-media-srv02" = {
-      vmid            = 104
-      hostname        = "horus-media-srv02"
-      type            = "lxc"
-      target_node     = "horus-pmx-node01"
-      cores           = 4
-      memory          = 4096
-      disk_size       = "32"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.214/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-      additional_mounts = [
-        {
-          mount_type   = "bind_mount"
-          volume       = "/mnt/pve/example-media"
-          mp           = "/storage/media"
-          storage_name = "storage-media"
-          size         = null
-        }
-      ]
-    }
-    "horus-lb-srv01" = {
-      vmid            = 105
-      hostname        = "horus-lb-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node01"
-      cores           = 2
-      memory          = 2048
-      disk_size       = "10"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.215/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-ans-srv01" = {
-      vmid            = 106
-      hostname        = "horus-ans-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node01"
-      cores           = 2
-      memory          = 4096
-      disk_size       = "20"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.216/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
+    "horus-lb-srv01"    = { vmid = 101, hostname = "horus-lb-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 1, memory = 1024, disk_size = "12", ip_address = "198.51.100.114/24", vlan_id = 170, feature_profile = "standard" }
+    "horus-agent-srv01" = { vmid = 102, hostname = "horus-agent-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 4, memory = 4096, disk_size = "20", ip_address = "198.51.100.2/24", vlan_id = 101, feature_profile = "docker", shared_datasets = [{ storage_name = "artifacts", path = "/srv/example/artifacts", read_only = false }] }
+    "horus-jnk-srv01"   = { vmid = 103, hostname = "horus-jnk-srv01", type = "vm", target_node = "horus-pmx-node01", cores = 2, memory = 4096, disk_size = "20", ip_address = "198.51.100.3/24", vlan_id = 101 }
+    "horus-ai-srv01"    = { vmid = 104, hostname = "horus-ai-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 4, memory = 6144, disk_size = "20", ip_address = "198.51.100.82/24", vlan_id = 150, feature_profile = "standard" }
+    "horus-db-srv01"    = { vmid = 105, hostname = "horus-db-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 2, memory = 2048, disk_size = "16", ip_address = "198.51.100.83/24", vlan_id = 150, feature_profile = "standard", private_mounts = [{ storage_name = "guardian-data", path = "/srv/example/guardian-data", size = "0" }] }
+    "horus-media-srv01" = { vmid = 106, hostname = "horus-media-srv01", type = "vm", target_node = "horus-pmx-node01", cores = 2, memory = 4096, disk_size = "20", ip_address = "198.51.100.4/24", vlan_id = 101, shared_datasets = [{ storage_name = "media", path = "/srv/example/media", read_only = false }] }
+    "horus-k8sw-srv01"  = { vmid = 107, hostname = "horus-k8sw-srv01", type = "vm", target_node = "horus-pmx-node01", cores = 3, memory = 3072, disk_size = "16", ip_address = "198.51.100.130/24", vlan_id = 180 }
 
-    # --------------------------------------------------------------------------
-    # NODE02 (horus-pmx-node02: 8C / 31.04 GiB RAM - IAM, Registry, Build Agent, AI Mimir)
-    # --------------------------------------------------------------------------
-    "horus-iam-srv01" = {
-      vmid            = 201
-      hostname        = "horus-iam-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node02"
-      cores           = 2
-      memory          = 2048
-      disk_size       = "20"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.221/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-media-srv01" = {
-      vmid            = 202
-      hostname        = "horus-media-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node02"
-      cores           = 2
-      memory          = 2048
-      disk_size       = "16"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.222/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "storage"
-      additional_mounts = [
-        {
-          mount_type   = "bind_mount"
-          volume       = "/mnt/pve/example-storage"
-          mp           = "/storage/files"
-          storage_name = "storage"
-          size         = null
-        },
-        {
-          mount_type   = "bind_mount"
-          volume       = "/mnt/pve/example-media"
-          mp           = "/storage/media"
-          storage_name = "storage-media"
-          size         = null
-        }
-      ]
-    }
-    "horus-agent-srv01" = {
-      vmid            = 203
-      hostname        = "horus-agent-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node02"
-      cores           = 4
-      memory          = 4096
-      disk_size       = "40"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.223/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "docker"
-    }
-    "horus-gg-srv01" = {
-      vmid            = 204
-      hostname        = "horus-gg-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node02"
-      cores           = 2
-      memory          = 2048
-      disk_size       = "15"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.224/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-ai-srv03" = {
-      vmid            = 205
-      hostname        = "horus-ai-srv03"
-      type            = "lxc"
-      target_node     = "horus-pmx-node02"
-      cores           = 4
-      memory          = 8192
-      disk_size       = "32"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.225/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-      additional_mounts = [
-        {
-          mount_type   = "dedicated_volume"
-          volume       = "storage-ai"
-          mp           = "/data-ai"
-          storage_name = "storage-ai"
-          size         = "400G"
-        }
-      ]
-    }
-    "horus-reg-srv01" = {
-      vmid            = 206
-      hostname        = "horus-reg-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node02"
-      cores           = 2
-      memory          = 4096
-      disk_size       = "40"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.226/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "docker"
-    }
+    "horus-ans-srv01"   = { vmid = 201, hostname = "horus-ans-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 2048, disk_size = "12", ip_address = "198.51.100.5/24", vlan_id = 101, feature_profile = "standard" }
+    "horus-ai-srv02"    = { vmid = 202, hostname = "horus-ai-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 6144, disk_size = "20", ip_address = "198.51.100.98/24", vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = "/srv/example/mimir-data", size = "0" }] }
+    "horus-db-srv02"    = { vmid = 203, hostname = "horus-db-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 4096, disk_size = "16", ip_address = "198.51.100.99/24", vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = "/srv/example/mimir-data/postgres", size = "0" }] }
+    "horus-vec-srv01"   = { vmid = 204, hostname = "horus-vec-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 3072, disk_size = "16", ip_address = "198.51.100.100/24", vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = "/srv/example/mimir-data/vectors", size = "0" }] }
+    "horus-cache-srv01" = { vmid = 205, hostname = "horus-cache-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 1024, disk_size = "12", ip_address = "198.51.100.101/24", vlan_id = 160, feature_profile = "standard" }
+    "horus-iam-srv01"   = { vmid = 206, hostname = "horus-iam-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 2048, disk_size = "12", ip_address = "198.51.100.6/24", vlan_id = 101, feature_profile = "standard" }
+    "horus-media-srv02" = { vmid = 207, hostname = "horus-media-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 2048, disk_size = "16", ip_address = "198.51.100.7/24", vlan_id = 101, feature_profile = "storage", shared_datasets = [{ storage_name = "media", path = "/srv/example/media", read_only = false }] }
+    "horus-k8sw-srv02"  = { vmid = 208, hostname = "horus-k8sw-srv02", type = "vm", target_node = "horus-pmx-node02", cores = 3, memory = 3072, disk_size = "16", ip_address = "198.51.100.131/24", vlan_id = 180 }
+    "horus-k8sc-srv01"  = { vmid = 209, hostname = "horus-k8sc-srv01", type = "vm", target_node = "horus-pmx-node02", cores = 2, memory = 3072, disk_size = "16", ip_address = "198.51.100.132/24", vlan_id = 180 }
 
-    # --------------------------------------------------------------------------
-    # NODE03 (horus-pmx-node03: 8C / 15.58 GiB RAM - Factory Node, NAS, DBs, Stateful)
-    # --------------------------------------------------------------------------
-    "horus-git-srv01" = {
-      vmid            = 301
-      hostname        = "horus-git-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node03"
-      cores           = 2
-      memory          = 2048
-      disk_size       = "20"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.231/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-      additional_mounts = [
-        {
-          mount_type   = "dedicated_volume"
-          volume       = "storage-work"
-          mp           = "/var/lib/gitea"
-          storage_name = "storage-work"
-          size         = "100G"
-        }
-      ]
-    }
-    "horus-vlt-srv01" = {
-      vmid              = 302
-      hostname          = "horus-vlt-srv01"
-      type              = "vm"
-      target_node       = "horus-pmx-node03"
-      factory_node      = "horus-pmx-node03"
-      cores             = 2
-      memory            = 2048
-      disk_size         = "32"
-      root_storage      = "local-lvm"
-      ip_address        = "203.0.113.232/24"
-      bridge            = "vmbr0"
-      vlan_id           = 0
-      image_source      = "9000"
-      clone_template_id = 9000
-      additional_disks = [
-        {
-          datastore    = "storage-work"
-          interface    = "scsi1"
-          size         = "50"
-          mount_type   = "dedicated_volume"
-          storage_name = "storage-work"
-        }
-      ]
-    }
-    "horus-wiki-srv01" = {
-      vmid            = 303
-      hostname        = "horus-wiki-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node03"
-      cores           = 1
-      memory          = 1024
-      disk_size       = "15"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.233/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-db-srv01" = {
-      vmid            = 304
-      hostname        = "horus-db-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node03"
-      cores           = 2
-      memory          = 4096
-      disk_size       = "30"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.234/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-      additional_mounts = [
-        {
-          mount_type   = "dedicated_volume"
-          volume       = "storage-work"
-          mp           = "/var/lib/postgresql/data"
-          storage_name = "storage-work"
-          size         = "800G"
-        }
-      ]
-    }
+    "horus-db-srv03"   = { vmid = 301, hostname = "horus-db-srv03", type = "lxc", target_node = "horus-pmx-node03", cores = 2, memory = 2560, disk_size = "16", ip_address = "198.51.100.8/24", vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "infra-data", path = "/srv/example/infra/postgres", size = "0" }] }
+    "horus-vlt-srv01"  = { vmid = 302, hostname = "horus-vlt-srv01", type = "vm", target_node = "horus-pmx-node03", cores = 2, memory = 1536, disk_size = "16", ip_address = "198.51.100.9/24", vlan_id = 101 }
+    "horus-wiki-srv01" = { vmid = 303, hostname = "horus-wiki-srv01", type = "lxc", target_node = "horus-pmx-node03", cores = 1, memory = 768, disk_size = "12", ip_address = "198.51.100.10/24", vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "infra-data", path = "/srv/example/infra/wiki", size = "0" }] }
+    "horus-git-srv01"  = { vmid = 304, hostname = "horus-git-srv01", type = "lxc", target_node = "horus-pmx-node03", cores = 2, memory = 1536, disk_size = "12", ip_address = "198.51.100.11/24", vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "infra-data", path = "/srv/example/infra/gitea", size = "0" }] }
+    "horus-work-srv01" = { vmid = 305, hostname = "horus-work-srv01", type = "vm", target_node = "horus-pmx-node03", cores = 2, memory = 2048, disk_size = "16", ip_address = "198.51.100.12/24", vlan_id = 101 }
+    "horus-reg-srv01"  = { vmid = 306, hostname = "horus-reg-srv01", type = "lxc", target_node = "horus-pmx-node03", cores = 2, memory = 2048, disk_size = "16", ip_address = "198.51.100.13/24", vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "artifacts-data", path = "/srv/example/artifacts/registry", size = "0" }] }
 
-    # --------------------------------------------------------------------------
-    # NODE04 (horus-pmx-node04: 4C / 15.54 GiB RAM - Observability, S3, AIOps)
-    # --------------------------------------------------------------------------
-    "horus-grf-srv01" = {
-      vmid            = 401
-      hostname        = "horus-grf-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node04"
-      cores           = 1
-      memory          = 1024
-      disk_size       = "10"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.241/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-pm-srv01" = {
-      vmid            = 402
-      hostname        = "horus-pm-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node04"
-      cores           = 2
-      memory          = 2048
-      disk_size       = "15"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.242/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-lok-srv01" = {
-      vmid            = 403
-      hostname        = "horus-lok-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node04"
-      cores           = 2
-      memory          = 2048
-      disk_size       = "15"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.243/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-otel-srv01" = {
-      vmid            = 404
-      hostname        = "horus-otel-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node04"
-      cores           = 1
-      memory          = 1024
-      disk_size       = "5"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.244/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
-    "horus-s3-srv01" = {
-      vmid            = 405
-      hostname        = "horus-s3-srv01"
-      type            = "lxc"
-      target_node     = "horus-pmx-node04"
-      cores           = 2
-      memory          = 2048
-      disk_size       = "40"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.245/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-      additional_mounts = [
-        {
-          mount_type   = "dedicated_volume"
-          volume       = "storage-logs"
-          mp           = "/data"
-          storage_name = "storage-logs"
-          size         = "430G"
-        }
-      ]
-    }
-    "horus-ai-srv04" = {
-      vmid            = 406
-      hostname        = "horus-ai-srv04"
-      type            = "lxc"
-      target_node     = "horus-pmx-node04"
-      cores           = 4
-      memory          = 4096
-      disk_size       = "32"
-      root_storage    = "local-lvm"
-      ip_address      = "203.0.113.246/24"
-      bridge          = "vmbr0"
-      vlan_id         = 0
-      image_source    = local.lxc_template_file_id
-      feature_profile = "standard"
-    }
+    "horus-grf-srv01"  = { vmid = 401, hostname = "horus-grf-srv01", type = "lxc", target_node = "horus-pmx-node04", cores = 1, memory = 1024, disk_size = "10", ip_address = "198.51.100.84/24", vlan_id = 150, feature_profile = "standard" }
+    "horus-pm-srv01"   = { vmid = 402, hostname = "horus-pm-srv01", type = "lxc", target_node = "horus-pmx-node04", cores = 2, memory = 2048, disk_size = "12", ip_address = "198.51.100.85/24", vlan_id = 150, feature_profile = "standard" }
+    "horus-lok-srv01"  = { vmid = 403, hostname = "horus-lok-srv01", type = "lxc", target_node = "horus-pmx-node04", cores = 2, memory = 2048, disk_size = "12", ip_address = "198.51.100.86/24", vlan_id = 150, feature_profile = "standard" }
+    "horus-otel-srv01" = { vmid = 404, hostname = "horus-otel-srv01", type = "lxc", target_node = "horus-pmx-node04", cores = 1, memory = 1024, disk_size = "12", ip_address = "198.51.100.87/24", vlan_id = 150, feature_profile = "standard" }
+    "horus-s3-srv01"   = { vmid = 405, hostname = "horus-s3-srv01", type = "lxc", target_node = "horus-pmx-node04", cores = 2, memory = 2048, disk_size = "16", ip_address = "198.51.100.88/24", vlan_id = 150, feature_profile = "storage", private_mounts = [{ storage_name = "logs-data", path = "/srv/example/logs", size = "0" }] }
+    "horus-ai-srv03"   = { vmid = 406, hostname = "horus-ai-srv03", type = "lxc", target_node = "horus-pmx-node04", cores = 2, memory = 2048, disk_size = "16", ip_address = "198.51.100.89/24", vlan_id = 150, feature_profile = "standard" }
   }
 
-  physical_node_ram_mb = {
-    "horus-pmx-node01" = 31785 # 31.04 GiB
-    "horus-pmx-node02" = 31785 # 31.04 GiB
-    "horus-pmx-node03" = 15953 # 15.58 GiB
-    "horus-pmx-node04" = 15912 # 15.54 GiB
+  lxc_workloads = { for name, workload in local.workloads : name => workload if workload.type == "lxc" }
+  vm_workloads  = { for name, workload in local.workloads : name => workload if workload.type == "vm" }
+
+  managed_private_storages = {
+    for name, storage in local.storage_inventory : name => storage
+    if storage.category == "private" && try(storage.terraform_managed, false)
   }
-
-  node01_ram_allocated_mb = sum([for w in values(local.workloads) : w.memory if w.target_node == "horus-pmx-node01"])
-  node02_ram_allocated_mb = sum([for w in values(local.workloads) : w.memory if w.target_node == "horus-pmx-node02"])
-  node03_ram_allocated_mb = sum([for w in values(local.workloads) : w.memory if w.target_node == "horus-pmx-node03"])
-  node04_ram_allocated_mb = sum([for w in values(local.workloads) : w.memory if w.target_node == "horus-pmx-node04"])
-
-  valid_nodes = ["horus-pmx-node01", "horus-pmx-node02", "horus-pmx-node03", "horus-pmx-node04"]
-
-  workload_mount_datastores = {
-    for k, w in local.workloads : k => [
-      for m in try(w.additional_mounts, []) : m.storage_name
+  private_mounts = flatten([
+    for name, workload in local.lxc_workloads : [
+      for mount in try(workload.private_mounts, []) : merge(mount, { workload = name, target_node = workload.target_node })
     ]
-  }
-
-  all_workload_mounts = flatten([
-    for k, w in local.workloads : concat(
-      [
-        for m in try(w.additional_mounts, []) : {
-          workload_key = k
-          hostname     = w.hostname
-          target_node  = w.target_node
-          storage_name = m.storage_name
-          volume       = m.volume
-          mp           = m.mp
-          mount_type   = m.mount_type
-          size         = try(m.size, null)
-        }
-      ],
-      [
-        for d in try(w.additional_disks, []) : {
-          workload_key = k
-          hostname     = w.hostname
-          target_node  = w.target_node
-          storage_name = d.storage_name
-          volume       = d.datastore
-          mp           = d.interface
-          mount_type   = try(d.mount_type, "dedicated_volume")
-          size         = d.size
-        }
-      ]
-    )
+  ])
+  shared_mounts = flatten([
+    for name, workload in local.workloads : [
+      for mount in try(workload.shared_datasets, []) : merge(mount, { workload = name })
+    ]
   ])
 
-  storage_inventory = {
-    "local" = {
-      storage_name      = "local"
-      scope             = "per_node"
-      physical_owner    = "per-node (node01, node02, node03, node04)"
-      type              = "dir"
-      device_or_path    = "System SSD Directory"
-      filesystem        = "ext4 / dir"
-      export_type       = "local"
-      allowed_consumers = ["horus-pmx-node01", "horus-pmx-node02", "horus-pmx-node03", "horus-pmx-node04"]
-      purpose           = "Proxmox directory storage (local to each node)"
-    }
-    "local-lvm" = {
-      storage_name      = "local-lvm"
-      scope             = "per_node"
-      physical_owner    = "per-node (node01, node02, node03, node04)"
-      type              = "lvm-thin"
-      device_or_path    = "System SSD LVM-thin"
-      filesystem        = "raw / lvm-thin"
-      export_type       = "local"
-      allowed_consumers = ["horus-pmx-node01", "horus-pmx-node02", "horus-pmx-node03", "horus-pmx-node04"]
-      purpose           = "System LVM-thin root filesystem storage for all VMs and LXCs"
-    }
-    "storage" = {
-      storage_name      = "storage"
-      scope             = "shared"
-      physical_owner    = "horus-pmx-node03"
-      type              = "nfs"
-      device_or_path    = "/dev/sda (2 TB WDC WD20EFRX)"
-      filesystem        = "ext4"
-      export_type       = "nfs"
-      allowed_consumers = ["horus-pmx-node01", "horus-pmx-node02", "horus-pmx-node03", "horus-pmx-node04"]
-      purpose           = "General NAS / user & application shared files"
-    }
-    "storage-media" = {
-      storage_name      = "storage-media"
-      scope             = "shared"
-      physical_owner    = "horus-pmx-node03"
-      type              = "nfs"
-      device_or_path    = "/dev/sdb (3 TB Seagate ST3000DM007)"
-      filesystem        = "ext4"
-      export_type       = "nfs"
-      allowed_consumers = ["horus-pmx-node01", "horus-pmx-node02"]
-      purpose           = "Media storage (JoyFilm, CasaOS media)"
-    }
-    "storage-work" = {
-      storage_name      = "storage-work"
-      scope             = "shared"
-      physical_owner    = "horus-pmx-node03"
-      type              = "nfs"
-      device_or_path    = "/dev/sdc (1 TB Seagate ST1000DM003)"
-      filesystem        = "ext4"
-      export_type       = "nfs"
-      allowed_consumers = ["horus-pmx-node01", "horus-pmx-node02", "horus-pmx-node03", "horus-pmx-node04"]
-      purpose           = "Application stateful persistent data (PostgreSQL, Gitea)"
-    }
-    "storage-infra" = {
-      storage_name      = "storage-infra"
-      scope             = "shared"
-      physical_owner    = "horus-pmx-node03"
-      type              = "nfs"
-      device_or_path    = "/dev/sdd (1 TB Toshiba MQ01ABD100)"
-      filesystem        = "ext4"
-      export_type       = "nfs"
-      allowed_consumers = ["horus-pmx-node01", "horus-pmx-node02", "horus-pmx-node03", "horus-pmx-node04"]
-      purpose           = "Infrastructure factory storage (ISO, LXC templates, VM/template artifacts, backups, snippets)"
-    }
-    "storage-ai" = {
-      storage_name      = "storage-ai"
-      scope             = "per_node"
-      physical_owner    = "horus-pmx-node02"
-      type              = "dir"
-      device_or_path    = "480 GB Seagate SSD"
-      filesystem        = "ext4"
-      export_type       = "local"
-      allowed_consumers = ["horus-pmx-node02"]
-      purpose           = "Local AI models, AI datasets, AI persistent data (Mimir horus-ai-srv03)"
-    }
-    "storage-logs" = {
-      storage_name      = "storage-logs"
-      scope             = "per_node"
-      physical_owner    = "horus-pmx-node04"
-      type              = "dir"
-      device_or_path    = "/dev/sdb (500 GB WD5000LPVT HDD)"
-      filesystem        = "ext4"
-      export_type       = "local"
-      allowed_consumers = ["horus-pmx-node04"]
-      purpose           = "Observability / monitoring data, logs & MinIO S3 backend (horus-s3-srv01)"
-    }
+  node_ram_allocated_mb = {
+    for node in keys(local.nodes) : node => sum([for workload in values(local.workloads) : workload.memory if workload.target_node == node])
+  }
+  local_lvm_logical_root_gib = {
+    for node in keys(local.nodes) : node => sum([for workload in values(local.workloads) : tonumber(workload.disk_size) if workload.target_node == node]) + (node == local.vm_template.node_name ? local.vm_template.root_gib : 0)
+  }
+  local_lvm_overcommit_ratio = {
+    for node, allocated in local.local_lvm_logical_root_gib : node => allocated / local.nodes[node].local_lvm_gib
   }
 }
 
-# 1. Placement completeness
-check "placement_completeness" {
+check "inventory" {
   assert {
-    condition     = length(local.workloads) == 22
-    error_message = "Expected exactly 22 workloads in the approved HoRus deployment scope."
+    condition     = length(local.workloads) == 28 && length(local.lxc_workloads) == 21 && length(local.vm_workloads) == 7
+    error_message = "HoRus inventory must contain exactly 28 workloads: 21 LXC and 7 VM."
   }
 }
 
-# 2. VMID uniqueness
-check "vmid_uniqueness" {
+check "identity_uniqueness" {
   assert {
-    condition     = length(distinct([for w in values(local.workloads) : w.vmid])) == 22
-    error_message = "VMIDs must be unique across all 22 workloads."
+    condition = (
+      length(distinct([for workload in values(local.workloads) : workload.vmid])) == length(local.workloads) &&
+      length(distinct([for workload in values(local.workloads) : workload.hostname])) == length(local.workloads)
+    )
+    error_message = "Workload VMIDs and hostnames must be unique."
   }
 }
 
-# 3. Hostname uniqueness
-check "hostname_uniqueness" {
+check "golden_baselines" {
   assert {
-    condition     = length(distinct(keys(local.workloads))) == 22
-    error_message = "Hostnames must be unique across all 22 workloads."
+    condition     = alltrue([for workload in values(local.workloads) : tonumber(workload.disk_size) >= (workload.type == "vm" ? local.vm_template.root_gib : local.lxc_template.root_gib)])
+    error_message = "VM roots must be at least 12 GiB and LXC roots at least 8 GiB."
   }
 }
 
-# 4. Target node validity
-check "node_validity" {
+check "placement_and_reserved_ids" {
   assert {
-    condition     = alltrue([for w in values(local.workloads) : contains(local.valid_nodes, w.target_node)])
-    error_message = "All workloads must be targeted to one of horus-pmx-node01..node04."
+    condition = (
+      alltrue([for workload in values(local.workloads) : (
+        contains(keys(local.nodes), workload.target_node) &&
+        (workload.target_node == "horus-pmx-node01" ? workload.vmid >= 101 && workload.vmid <= 107 :
+          workload.target_node == "horus-pmx-node02" ? workload.vmid >= 201 && workload.vmid <= 209 :
+          workload.target_node == "horus-pmx-node03" ? workload.vmid >= 301 && workload.vmid <= 306 :
+        workload.vmid >= 401 && workload.vmid <= 406)
+      )]) &&
+      !contains([for workload in values(local.workloads) : workload.vmid], 307) &&
+      !contains([for workload in values(local.workloads) : workload.vmid], local.vm_template.vm_id) &&
+      !contains([for workload in values(local.workloads) : workload.vmid], local.lxc_template.vm_id)
+    )
+    error_message = "Every workload must use its approved final-node VMID range; 307, 9000 and 9001 are reserved."
   }
 }
 
-# 5. Type validity
-check "type_validity" {
+check "network" {
   assert {
-    condition     = alltrue([for w in values(local.workloads) : contains(["vm", "lxc"], w.type)])
-    error_message = "Workload type must be either 'vm' or 'lxc'."
+    condition = alltrue([for workload in values(local.workloads) : try(
+      cidrhost(workload.ip_address, 0) == cidrhost(local.vlans[tostring(workload.vlan_id)].cidr, 0) &&
+      cidrhost(workload.ip_address, 1) == local.vlans[tostring(workload.vlan_id)].gateway,
+      false
+    )])
+    error_message = "Every workload VLAN must exist and its IP subnet/gateway must match the central VLAN map."
   }
 }
 
-# 6. Image source correctness
-check "image_source_correctness" {
+check "ram_capacity" {
   assert {
-    condition = alltrue([
-      for w in values(local.workloads) : (
-        w.type == "lxc" ? w.image_source == "storage-infra:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst" : w.image_source == "9000"
-      )
-    ])
-    error_message = "LXC workloads must use storage-infra LXC template, and VM workloads must use Golden VM 9000."
+    condition     = alltrue([for node, allocated in local.node_ram_allocated_mb : allocated <= local.nodes[node].ram_mb])
+    error_message = "Workload RAM allocation exceeds physical node RAM."
   }
 }
 
-# 7. Root storage validity
-check "root_storage_validity" {
+check "storage_boundaries" {
   assert {
-    condition     = alltrue([for w in values(local.workloads) : w.root_storage == "local-lvm"])
-    error_message = "All workloads must use local-lvm for root filesystem."
+    condition = (
+      alltrue([for mount in local.private_mounts : (
+        try(local.storage_inventory[mount.storage_name].category, "") == "private" &&
+        local.storage_inventory[mount.storage_name].physical_owner == mount.target_node &&
+        mount.size == "0"
+      )]) &&
+      alltrue([for mount in local.shared_mounts : (
+        try(local.storage_inventory[mount.storage_name].category, "") == "shared" &&
+        contains(try(local.storage_inventory[mount.storage_name].allowed_workloads, []), mount.workload)
+      )]) &&
+      length(try(local.workloads["horus-ai-srv01"].private_mounts, [])) == 0
+    )
+    error_message = "Private state must be single-owner Proxmox storage; shared data must remain guest-managed NFS. Guardian AI must not receive Guardian DB files."
   }
 }
 
-# 8. Storage consumer rules: storage-media (only node01, node02)
-check "storage_media_consumer" {
+check "retired_names_absent" {
   assert {
-    condition = alltrue([
-      for k, ds_list in local.workload_mount_datastores : (
-        contains(ds_list, "storage-media") ? contains(["horus-pmx-node01", "horus-pmx-node02"], local.workloads[k].target_node) : true
-      )
-    ])
-    error_message = "storage-media can only be consumed by workloads on horus-pmx-node01 or horus-pmx-node02."
+    condition     = alltrue([for retired in ["horus-ai-srv04", "horus-gg-srv01"] : !contains(keys(local.workloads), retired)])
+    error_message = "Retired workload names must remain absent."
   }
 }
 
-# 9. Storage consumer rules: storage-ai (only node02)
-check "storage_ai_consumer" {
+# Keep the accepted thin-provisioning risk explicit and detect any unreviewed
+# capacity drift. Workload sizes are not reduced to make this assertion pass.
+check "local_lvm_capacity_accounting" {
   assert {
-    condition = alltrue([
-      for k, ds_list in local.workload_mount_datastores : (
-        contains(ds_list, "storage-ai") ? local.workloads[k].target_node == "horus-pmx-node02" : true
-      )
-    ])
-    error_message = "storage-ai is local to horus-pmx-node02 and cannot be consumed by other nodes."
-  }
-}
-
-# 10. Storage consumer rules: storage-logs (only node04)
-check "storage_logs_consumer" {
-  assert {
-    condition = alltrue([
-      for k, ds_list in local.workload_mount_datastores : (
-        contains(ds_list, "storage-logs") ? local.workloads[k].target_node == "horus-pmx-node04" : true
-      )
-    ])
-    error_message = "storage-logs is local to horus-pmx-node04 and cannot be consumed by other nodes."
-  }
-}
-
-# 11. Workload 305 / horus-retro-srv01 absence
-check "workload_305_absent" {
-  assert {
-    condition     = !contains(keys(local.workloads), "horus-retro-srv01") && !contains([for w in values(local.workloads) : w.vmid], 305)
-    error_message = "VMID 305 (horus-retro-srv01) is excluded from the current deployment scope."
-  }
-}
-
-# 12. VM image isolation
-check "vm_image_isolation" {
-  assert {
-    condition = alltrue([
-      for w in values(local.workloads) : (
-        w.type == "vm" ? !endswith(w.image_source, ".tar.zst") : true
-      )
-    ])
-    error_message = "VM workloads must not use LXC .tar.zst templates."
-  }
-}
-
-# 13. LXC image isolation
-check "lxc_image_isolation" {
-  assert {
-    condition = alltrue([
-      for w in values(local.workloads) : (
-        w.type == "lxc" ? w.image_source != "9000" : true
-      )
-    ])
-    error_message = "LXC workloads must not clone VM template 9000."
-  }
-}
-
-# Resource capacity check
-check "resource_capacity" {
-  assert {
-    condition     = local.node01_ram_allocated_mb <= local.physical_node_ram_mb["horus-pmx-node01"]
-    error_message = "Node01 allocated RAM exceeds physical RAM capacity."
-  }
-  assert {
-    condition     = local.node02_ram_allocated_mb <= local.physical_node_ram_mb["horus-pmx-node02"]
-    error_message = "Node02 allocated RAM exceeds physical RAM capacity."
-  }
-  assert {
-    condition     = local.node03_ram_allocated_mb <= local.physical_node_ram_mb["horus-pmx-node03"]
-    error_message = "Node03 allocated RAM exceeds physical RAM capacity."
-  }
-  assert {
-    condition     = local.node04_ram_allocated_mb <= local.physical_node_ram_mb["horus-pmx-node04"]
-    error_message = "Node04 allocated RAM exceeds physical RAM capacity."
-  }
-}
-
-# 14. Generic storage inventory & mount validation
-check "generic_storage_mount_validation" {
-  # 1. Datastore/Storage exists in storage_inventory
-  assert {
-    condition     = alltrue([for m in local.all_workload_mounts : contains(keys(local.storage_inventory), m.storage_name)])
-    error_message = "All mounted storage names must exist in local.storage_inventory."
-  }
-
-  # 2. Target node is an allowed consumer for the storage
-  assert {
-    condition     = alltrue([for m in local.all_workload_mounts : contains(local.storage_inventory[m.storage_name].allowed_consumers, m.target_node)])
-    error_message = "Workload target_node must be listed in storage_inventory allowed_consumers for the requested storage."
-  }
-
-  # 3. bind_mount validation
-  assert {
-    condition = alltrue([
-      for m in local.all_workload_mounts : (
-        m.mount_type == "bind_mount" ? (
-          can(regex("^/mnt/pve/", m.volume)) && m.size == null
-        ) : true
-      )
-    ])
-    error_message = "bind_mount entries must specify a valid host path starting with /mnt/pve/ for volume and omit size."
-  }
-
-  # 4. dedicated_volume validation
-  assert {
-    condition = alltrue([
-      for m in local.all_workload_mounts : (
-        m.mount_type == "dedicated_volume" ? m.size != null : true
-      )
-    ])
-    error_message = "dedicated_volume entries must specify a non-null disk size."
-  }
-
-  # 5. Local storage isolation (local directory storage cannot be consumed cross-node)
-  assert {
-    condition = alltrue([
-      for m in local.all_workload_mounts : (
-        local.storage_inventory[m.storage_name].export_type == "local" && !can(regex(".*,.*", local.storage_inventory[m.storage_name].physical_owner)) ?
-        local.storage_inventory[m.storage_name].physical_owner == m.target_node : true
-      )
-    ])
-    error_message = "Local single-node datastores (e.g. storage-ai, storage-logs) can only be mounted on their physical owner node."
-  }
-
-  # 6. storage-media bind_mount semantics validation
-  assert {
-    condition = alltrue([
-      for m in local.all_workload_mounts : (
-        m.storage_name == "storage-media" ?
-        m.mount_type == "bind_mount" &&
-        m.volume == "/mnt/pve/example-media" &&
-        m.size == null
-        : true
-      )
-    ])
-    error_message = "storage-media mounts must use bind_mount semantics referencing /mnt/pve/example-media without volume allocation."
-  }
-
-  # 7. storage bind_mount semantics validation for horus-media-srv01
-  assert {
-    condition = alltrue([
-      for m in local.all_workload_mounts : (
-        m.hostname == "horus-media-srv01" && m.storage_name == "storage" ?
-        m.mount_type == "bind_mount" &&
-        m.volume == "/mnt/pve/example-storage" &&
-        m.size == null
-        : true
-      )
-    ])
-    error_message = "storage mount for horus-media-srv01 must use bind_mount referencing /mnt/pve/example-storage without volume allocation."
-  }
-
-  # 8. Vault 302 persistent storage on storage-work validation
-  assert {
-    condition     = contains([for m in local.all_workload_mounts : "${m.hostname}:${m.storage_name}"], "horus-vlt-srv01:storage-work")
-    error_message = "horus-vlt-srv01 (Vault) must have persistent storage configured on storage-work."
+    condition = (
+      local.local_lvm_logical_root_gib == {
+        "horus-pmx-node01" = 124
+        "horus-pmx-node02" = 136
+        "horus-pmx-node03" = 100
+        "horus-pmx-node04" = 78
+      } &&
+      local.local_lvm_overcommit_ratio["horus-pmx-node01"] <= 1 &&
+      alltrue([for node in ["horus-pmx-node02", "horus-pmx-node03", "horus-pmx-node04"] : local.local_lvm_overcommit_ratio[node] > 1])
+    )
+    error_message = "Reviewed local-lvm capacity changed. Recalculate physical capacity and logical thin allocation before apply."
   }
 }
