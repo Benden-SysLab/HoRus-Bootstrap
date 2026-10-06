@@ -1,11 +1,24 @@
-# HoRus-Bootstrap v2.0.0
+# HoRus-Bootstrap v2.0.1
 
-Published release: `v2.0.0`.
+Release: `v2.0.1`.
 
 This major version represents the rebuilt four-node topology, the authoritative
 workload inventory and a materially different VM/LXC provisioning lifecycle.
 Environment-specific addresses, network coordinates, NFS endpoints and physical
 paths are local inputs supplied through the ignored `terraform.tfvars`.
+
+## Privacy hardening
+
+- Environment-specific network and storage coordinates were moved to the
+  ignored private configuration.
+- The public HoRus architecture, four-node placement and complete 28-workload
+  inventory remain tracked and unchanged.
+- The refactor has zero infrastructure delta; the live-cluster plan converged
+  with `No changes. Your infrastructure matches the configuration.`
+- Reachable public Git history was rewritten to replace historical operational
+  coordinates with documentation values while preserving technical context.
+- The previous public `v2.0.0` release and tag are retired; `v2.0.1` is the
+  first release from the sanitized history.
 
 ## Highlights
 
