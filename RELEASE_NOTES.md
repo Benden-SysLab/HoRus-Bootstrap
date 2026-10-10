@@ -1,4 +1,16 @@
-# HoRus-Bootstrap v2.0.1
+# HoRus-Bootstrap release notes
+
+## Unreleased
+
+- Added `horus-gg-srv01`: VMID 108, LXC, Node01, VLAN 150, 2 vCPU, 2 GiB RAM
+  and 16 GiB root for isolated GitGuardian CLI/ggshield, TruffleHog and Trivy
+  scanning. Terraform owns infrastructure and lifecycle; Ansible/service
+  automation owns software, schedules, credentials and CI integration.
+- Inventory is now 29 workloads: 22 LXC and 7 VM, distributed 8 / 9 / 6 / 6.
+  Node01 uses VMIDs 101-108 and allocates 20 vCPU, 26 GiB RAM and 140 GiB
+  logical roots on 130.27 GiB physical `local-lvm` (approximately 1.07x).
+
+## v2.0.1
 
 Release: `v2.0.1`.
 

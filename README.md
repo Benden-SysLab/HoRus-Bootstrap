@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Terraform bootstrap for the rebuilt four-node HoRus Proxmox VE cluster. The
-repository manages 28 workloads—21 unprivileged LXC containers and 7 virtual
+repository manages 29 workloads—22 unprivileged LXC containers and 7 virtual
 machines—together with their placement, compute, network and private storage
 attachments.
 
@@ -82,6 +82,7 @@ private network design rather than documented in this public repository.
 | Node01 | 105 | LXC | `horus-db-srv01` | 150 |
 | Node01 | 106 | VM | `horus-media-srv01` | 101 |
 | Node01 | 107 | VM | `horus-k8sw-srv01` | 180 |
+| Node01 | 108 | LXC | `horus-gg-srv01` | 150 |
 | Node02 | 201 | LXC | `horus-ans-srv01` | 101 |
 | Node02 | 202 | LXC | `horus-ai-srv02` | 160 |
 | Node02 | 203 | LXC | `horus-db-srv02` | 160 |
@@ -104,8 +105,16 @@ private network design rather than documented in this public repository.
 | Node04 | 405 | LXC | `horus-s3-srv01` | 150 |
 | Node04 | 406 | LXC | `horus-ai-srv03` | 150 |
 
-Node totals are 7 / 9 / 6 / 6. VMID 307 is reserved and is not created by
+Node totals are 8 / 9 / 6 / 6. Node01 uses VMIDs 101-108. VMID 307 is reserved and is not created by
 Terraform.
+
+`horus-gg-srv01` is the isolated GitGuardian CLI/ggshield, TruffleHog and
+Trivy security scanner. Terraform creates the LXC, sets its identity, compute,
+network and placement, moves its rootfs to `local-lvm`, starts it and enables
+`start_on_boot`. Ansible/service automation installs and configures the scanner
+software, schedules, credentials and CI integration. Node01 accounts for 20
+vCPU, 26 GiB RAM and 140 GiB of logical workload roots on 130.27 GiB physical
+`local-lvm`, a reviewed thin-provisioning ratio of approximately 1.07x.
 
 ## Golden templates
 

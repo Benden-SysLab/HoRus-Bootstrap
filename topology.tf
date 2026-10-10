@@ -90,6 +90,7 @@ locals {
     "horus-db-srv01"    = { vmid = 105, hostname = "horus-db-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 2, memory = 2048, disk_size = "16", ip_address = var.environment.workload_ips["horus-db-srv01"], vlan_id = 150, feature_profile = "standard", private_mounts = [{ storage_name = "guardian-data", path = var.environment.guest_paths["guardian-data"], size = "0" }] }
     "horus-media-srv01" = { vmid = 106, hostname = "horus-media-srv01", type = "vm", target_node = "horus-pmx-node01", cores = 2, memory = 4096, disk_size = "20", ip_address = var.environment.workload_ips["horus-media-srv01"], vlan_id = 101, shared_datasets = [{ storage_name = "media", path = var.environment.guest_paths["media"], read_only = false }] }
     "horus-k8sw-srv01"  = { vmid = 107, hostname = "horus-k8sw-srv01", type = "vm", target_node = "horus-pmx-node01", cores = 3, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-k8sw-srv01"], vlan_id = 180 }
+    "horus-gg-srv01"    = { vmid = 108, hostname = "horus-gg-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 2, memory = 2048, disk_size = "16", ip_address = var.environment.workload_ips["horus-gg-srv01"], vlan_id = 150, feature_profile = "standard" }
 
     "horus-ans-srv01"   = { vmid = 201, hostname = "horus-ans-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 2048, disk_size = "12", ip_address = var.environment.workload_ips["horus-ans-srv01"], vlan_id = 101, feature_profile = "standard" }
     "horus-ai-srv02"    = { vmid = 202, hostname = "horus-ai-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 6144, disk_size = "20", ip_address = var.environment.workload_ips["horus-ai-srv02"], vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = var.environment.guest_paths["mimir-data"], size = "0" }] }
@@ -154,8 +155,8 @@ locals {
 
 check "inventory" {
   assert {
-    condition     = length(local.workloads) == 28 && length(local.lxc_workloads) == 21 && length(local.vm_workloads) == 7
-    error_message = "HoRus inventory must contain exactly 28 workloads: 21 LXC and 7 VM."
+    condition     = length(local.workloads) == 29 && length(local.lxc_workloads) == 22 && length(local.vm_workloads) == 7
+    error_message = "HoRus inventory must contain exactly 29 workloads: 22 LXC and 7 VM."
   }
 }
 
@@ -181,7 +182,7 @@ check "placement_and_reserved_ids" {
     condition = (
       alltrue([for workload in values(local.workloads) : (
         contains(keys(local.nodes), workload.target_node) &&
-        (workload.target_node == "horus-pmx-node01" ? workload.vmid >= 101 && workload.vmid <= 107 :
+        (workload.target_node == "horus-pmx-node01" ? workload.vmid >= 101 && workload.vmid <= 108 :
           workload.target_node == "horus-pmx-node02" ? workload.vmid >= 201 && workload.vmid <= 209 :
           workload.target_node == "horus-pmx-node03" ? workload.vmid >= 301 && workload.vmid <= 306 :
         workload.vmid >= 401 && workload.vmid <= 406)
@@ -239,7 +240,7 @@ check "storage_boundaries" {
 
 check "retired_names_absent" {
   assert {
-    condition     = alltrue([for retired in ["horus-ai-srv04", "horus-gg-srv01"] : !contains(keys(local.workloads), retired)])
+    condition     = alltrue([for retired in ["horus-ai-srv04"] : !contains(keys(local.workloads), retired)])
     error_message = "Retired workload names must remain absent."
   }
 }
@@ -250,13 +251,12 @@ check "local_lvm_capacity_accounting" {
   assert {
     condition = (
       local.local_lvm_logical_root_gib == {
-        "horus-pmx-node01" = 124
+        "horus-pmx-node01" = 140
         "horus-pmx-node02" = 136
         "horus-pmx-node03" = 100
         "horus-pmx-node04" = 78
       } &&
-      local.local_lvm_overcommit_ratio["horus-pmx-node01"] <= 1 &&
-      alltrue([for node in ["horus-pmx-node02", "horus-pmx-node03", "horus-pmx-node04"] : local.local_lvm_overcommit_ratio[node] > 1])
+      alltrue([for node in keys(local.nodes) : local.local_lvm_overcommit_ratio[node] > 1])
     )
     error_message = "Reviewed local-lvm capacity changed. Recalculate physical capacity and logical thin allocation before apply."
   }

@@ -35,6 +35,7 @@ environment = {
     horus-db-srv01 = "198.51.100.83/28"
     horus-media-srv01 = "198.51.100.4/28"
     horus-k8sw-srv01 = "198.51.100.130/28"
+    horus-gg-srv01 = "198.51.100.90/28"
     horus-ans-srv01 = "198.51.100.5/28"
     horus-ai-srv02 = "198.51.100.98/28"
     horus-db-srv02 = "198.51.100.99/28"

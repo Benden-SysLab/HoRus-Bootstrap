@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 用于重建后的四节点 HoRus Proxmox VE 集群的 Terraform bootstrap。本仓库管理
-28 个工作负载：21 个非特权 LXC 容器和 7 台虚拟机。
+29 个工作负载：22 个非特权 LXC 容器和 7 台虚拟机。
 
 完整参考：[README.md](README.md)。详细架构：[ARCHITECTURE.md](ARCHITECTURE.md)。
 权威拓扑：[`topology.tf`](topology.tf)。
@@ -65,13 +65,15 @@ Kubernetes：Pod CIDR `private`，Service CIDR `private`。
 
 | 节点 | LXC | VM | 总数 |
 |---|---|---|---:|
-| Node01 | 101 `horus-lb-srv01`、102 `horus-agent-srv01`、104 `horus-ai-srv01`、105 `horus-db-srv01` | 103 `horus-jnk-srv01`、106 `horus-media-srv01`、107 `horus-k8sw-srv01` | 7 |
+| Node01 | 101 `horus-lb-srv01`、102 `horus-agent-srv01`、104 `horus-ai-srv01`、105 `horus-db-srv01`、108 `horus-gg-srv01` | 103 `horus-jnk-srv01`、106 `horus-media-srv01`、107 `horus-k8sw-srv01` | 8 |
 | Node02 | 201 `horus-ans-srv01`、202 `horus-ai-srv02`、203 `horus-db-srv02`、204 `horus-vec-srv01`、205 `horus-cache-srv01`、206 `horus-iam-srv01`、207 `horus-media-srv02` | 208 `horus-k8sw-srv02`、209 `horus-k8sc-srv01` | 9 |
 | Node03 | 301 `horus-db-srv03`、303 `horus-wiki-srv01`、304 `horus-git-srv01`、306 `horus-reg-srv01` | 302 `horus-vlt-srv01`、305 `horus-work-srv01` | 6 |
 | Node04 | 401 `horus-grf-srv01`、402 `horus-pm-srv01`、403 `horus-lok-srv01`、404 `horus-otel-srv01`、405 `horus-s3-srv01`、406 `horus-ai-srv03` | — | 6 |
-| **总计** | **21 LXC** | **7 VM** | **28** |
+| **总计** | **22 LXC** | **7 VM** | **29** |
 
 VMID 307 已保留，Terraform 不会创建它。
+
+Node01 使用 VMID 101-108。`horus-gg-srv01`（VMID 108、LXC、VLAN 150）是隔离的 GitGuardian CLI/ggshield、TruffleHog 和 Trivy scanner。Terraform 创建并放置 LXC、将 rootfs 移至 `local-lvm`、启动并启用 `start_on_boot`；Ansible/service automation 安装并配置 scanners、schedule、credentials 和 CI integration。Node01 为 20 vCPU、26 GiB RAM，并在 130.27 GiB 物理 `local-lvm` 上分配 140 GiB logical roots（thin provisioning ≈1.07x）。
 
 ## Golden 模板
 

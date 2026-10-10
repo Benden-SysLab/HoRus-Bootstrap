@@ -10,18 +10,24 @@ metadata, workloads and storage consumers exactly once. `main.tf` derives
 `for_each` VM and LXC module instances; scripts do not contain a second workload
 inventory.
 
-The converged cluster contains 28 managed workloads: 21 LXC and 7 VM.
+The target cluster contains 29 managed workloads: 22 LXC and 7 VM.
 
 | Final node | VMID range | LXC | VM | Total |
 |---|---:|---:|---:|---:|
-| `horus-pmx-node01` | 101-107 | 4 | 3 | 7 |
+| `horus-pmx-node01` | 101-108 | 5 | 3 | 8 |
 | `horus-pmx-node02` | 201-209 | 7 | 2 | 9 |
 | `horus-pmx-node03` | 301-306 | 4 | 2 | 6 |
 | `horus-pmx-node04` | 401-406 | 6 | 0 | 6 |
-| **Total** |  | **21** | **7** | **28** |
+| **Total** |  | **22** | **7** | **29** |
 
 VMID 307 is reserved. Golden VMIDs 9000 and 9001 are external prerequisites
 and remain outside Terraform state.
+
+VMID 108 is `horus-gg-srv01`, an LXC on Node01 and VLAN 150 for isolated
+GitGuardian CLI/ggshield, TruffleHog and Trivy scanning. Terraform owns its
+existence, identity, compute, network, placement, rootfs move to `local-lvm`,
+start and `start_on_boot`. Ansible/service automation owns scanner installation,
+schedules, credentials and CI integration.
 
 ## Ownership boundaries
 
@@ -182,8 +188,9 @@ their consumer metadata, while Ansible/service automation later configures NFS
 inside guests. Private database trees are never documented or exposed as shared
 datasets. Guardian AI receives no raw Guardian PostgreSQL files.
 
-The approved local-LVM model is thin-provisioned and overcommitted on Node02,
-Node03 and Node04. Capacity accounting is asserted in Terraform and documented
+The approved local-LVM model is thin-provisioned and overcommitted on all four
+nodes. Node01 has 20 allocated vCPU, 26 GiB RAM and 140 GiB logical workload
+roots on approximately 130.27 GiB physical `local-lvm` (about 1.07x). Capacity accounting is asserted in Terraform and documented
 in [RESOURCE_PLAN.md](RESOURCE_PLAN.md); sizes are not silently reduced.
 
 ## Network segmentation

@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Bootstrap con Terraform para el clúster HoRus Proxmox VE reconstruido de cuatro
-nodos. El repositorio administra 28 cargas: 21 contenedores LXC sin privilegios
+nodos. El repositorio administra 29 cargas: 22 contenedores LXC sin privilegios
 y 7 máquinas virtuales.
 
 Referencia completa: [README.md](README.md). Diseño detallado:
@@ -68,13 +68,15 @@ Kubernetes: Pod CIDR `private`, Service CIDR `private`.
 
 | Nodo | LXC | VM | Total |
 |---|---|---|---:|
-| Node01 | 101 `horus-lb-srv01`, 102 `horus-agent-srv01`, 104 `horus-ai-srv01`, 105 `horus-db-srv01` | 103 `horus-jnk-srv01`, 106 `horus-media-srv01`, 107 `horus-k8sw-srv01` | 7 |
+| Node01 | 101 `horus-lb-srv01`, 102 `horus-agent-srv01`, 104 `horus-ai-srv01`, 105 `horus-db-srv01`, 108 `horus-gg-srv01` | 103 `horus-jnk-srv01`, 106 `horus-media-srv01`, 107 `horus-k8sw-srv01` | 8 |
 | Node02 | 201 `horus-ans-srv01`, 202 `horus-ai-srv02`, 203 `horus-db-srv02`, 204 `horus-vec-srv01`, 205 `horus-cache-srv01`, 206 `horus-iam-srv01`, 207 `horus-media-srv02` | 208 `horus-k8sw-srv02`, 209 `horus-k8sc-srv01` | 9 |
 | Node03 | 301 `horus-db-srv03`, 303 `horus-wiki-srv01`, 304 `horus-git-srv01`, 306 `horus-reg-srv01` | 302 `horus-vlt-srv01`, 305 `horus-work-srv01` | 6 |
 | Node04 | 401 `horus-grf-srv01`, 402 `horus-pm-srv01`, 403 `horus-lok-srv01`, 404 `horus-otel-srv01`, 405 `horus-s3-srv01`, 406 `horus-ai-srv03` | — | 6 |
-| **Total** | **21 LXC** | **7 VM** | **28** |
+| **Total** | **22 LXC** | **7 VM** | **29** |
 
 VMID 307 está reservado y Terraform no lo crea.
+
+Node01 usa VMID 101-108. `horus-gg-srv01` (VMID 108, LXC, VLAN 150) es el scanner aislado de GitGuardian CLI/ggshield, TruffleHog y Trivy. Terraform crea y ubica el LXC, mueve su rootfs a `local-lvm`, lo inicia y activa `start_on_boot`; Ansible/service automation instala y configura scanners, horarios, credenciales e integración CI. Node01: 20 vCPU, 26 GiB RAM y 140 GiB de roots lógicos sobre 130.27 GiB físicos (thin provisioning ≈1.07x).
 
 ## Plantillas Golden
 

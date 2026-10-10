@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Terraform-bootstrap обновлённого четырёхнодового кластера HoRus Proxmox VE.
-Репозиторий управляет 28 workloads: 21 непривилегированным LXC-контейнером и
+Репозиторий управляет 29 workloads: 22 непривилегированными LXC-контейнерами и
 7 виртуальными машинами, включая их размещение, вычислительные ресурсы, сеть и
 подключение приватных хранилищ.
 
@@ -82,6 +82,7 @@ Kubernetes Pod и Service CIDR относятся к environment-specific сет
 | Node01 | 105 | LXC | `horus-db-srv01` | private | 150 |
 | Node01 | 106 | VM | `horus-media-srv01` | private | 101 |
 | Node01 | 107 | VM | `horus-k8sw-srv01` | private | 180 |
+| Node01 | 108 | LXC | `horus-gg-srv01` | private | 150 |
 | Node02 | 201 | LXC | `horus-ans-srv01` | private | 101 |
 | Node02 | 202 | LXC | `horus-ai-srv02` | private | 160 |
 | Node02 | 203 | LXC | `horus-db-srv02` | private | 160 |
@@ -104,8 +105,16 @@ Kubernetes Pod и Service CIDR относятся к environment-specific сет
 | Node04 | 405 | LXC | `horus-s3-srv01` | private | 150 |
 | Node04 | 406 | LXC | `horus-ai-srv03` | private | 150 |
 
-Количество по нодам: 7 / 9 / 6 / 6. VMID 307 зарезервирован и Terraform его
+Количество по нодам: 8 / 9 / 6 / 6. Node01 использует VMID 101-108. VMID 307 зарезервирован и Terraform его
 не создаёт.
+
+`horus-gg-srv01` — изолированный security scanner для GitGuardian CLI/ggshield,
+TruffleHog и Trivy. Terraform создаёт LXC, задаёт VMID, CPU, RAM, сеть и
+placement, переносит rootfs в `local-lvm`, запускает контейнер и включает
+`start_on_boot`. Ansible/service automation устанавливает и настраивает
+сканеры, расписание, credentials и интеграцию с CI. На Node01 выделено 20 vCPU,
+26 GiB RAM и 140 GiB logical workload roots при 130.27 GiB физического
+`local-lvm`: утверждённый небольшой thin-provisioning overcommit около 1.07x.
 
 ## Golden templates
 
