@@ -1,6 +1,11 @@
 # HoRus-Bootstrap release notes
 
-## Unreleased
+## v2.0.2
+
+Release: `v2.0.2`.
+
+This release restores the dedicated isolated security-scanner workload while
+preserving the converged Terraform architecture introduced in v2.0.1.
 
 - Added `horus-gg-srv01`: VMID 108, LXC, Node01, VLAN 150, 2 vCPU, 2 GiB RAM
   and 16 GiB root for isolated GitGuardian CLI/ggshield, TruffleHog and Trivy
@@ -9,6 +14,9 @@
 - Inventory is now 29 workloads: 22 LXC and 7 VM, distributed 8 / 9 / 6 / 6.
   Node01 uses VMIDs 101-108 and allocates 20 vCPU, 26 GiB RAM and 140 GiB
   logical roots on 130.27 GiB physical `local-lvm` (approximately 1.07x).
+- The post-deployment Terraform plan converged with
+  `No changes. Your infrastructure matches the configuration.` Existing
+  workloads and external Golden templates 9000/9001 were not replaced.
 
 ## v2.0.1
 
