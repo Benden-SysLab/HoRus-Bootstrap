@@ -12,16 +12,16 @@ Environment-specific management/workload адреси, VLAN CIDR і gateway, NFS
 
 ## Стан
 
-Поточний desired state розгорнуто та приведено до збіжного стану. Оновлений
-`terraform plan -parallelism=1` повернув:
+Поточний desired state розгорнуто та приведено до збіжного стану. Після
+відновлення storage DB03 `terraform plan -parallelism=5` повернув:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Це незалежно підтверджує, що порожню Workspace VM виведено з експлуатації, а
-Registry тепер використовує VMID 305. Цей release workflow не виконував apply.
-Зафіксована версія provider: `bpg/proxmox 0.115.0`.
+Controlled apply замінив лише порожній LXC DB03 та його placement helper; VM
+302 та всі інші workloads не змінювалися. Зафіксована версія provider:
+`bpg/proxmox 0.115.0`.
 
 ## Архітектура
 
@@ -122,16 +122,15 @@ Helper не мігрує контейнери між вузлами, нікол�
 
 Private data належать одному сервісу: Guardian на Node01, Mimir та AI на
 Node02, infrastructure/Registry на Node03, MinIO logs на Node04. PostgreSQL 17
-на `horus-db-srv03` (VMID 301, `horus-pmx-node03`, `10.10.1.31/24`, VLAN 101)
-зберігає root на `local-lvm` і використовує
-`pg-local:301/subvol-301-disk-0.subvol`. Guest mount:
+на `horus-db-srv03` (VMID 301, Node03, VLAN 101) зберігає root на `local-lvm`.
+Terraform/provider виділяє PostgreSQL volume на `pg-local` і монтує його в
 `/srv/horus/infra/postgres`; `PGDATA`:
-`/srv/horus/infra/postgres/17/main`.
+`/srv/horus/infra/postgres/17/main`. Окремий volume 8 GiB на `storage-infra`
+монтується в `/srv/horus/infra/backups`.
 
-`storage-infra` — shared NFS datastore; `pg-local` — локальний directory
-datastore Node03. Terraform представляє наявний volume без міграції PostgreSQL
-на NFS і без заміни VMID 301. Shared media та artifacts пізніше налаштовує
-Ansible. Guardian AI не отримує raw PostgreSQL files.
+Clone lifecycle резервує disk index 0 на `storage-infra` для тимчасового
+rootfs, тому backup використовує `storage-infra:301/vm-301-disk-1.raw`.
+Guardian AI не отримує raw PostgreSQL files.
 
 Root SSH вимкнено в Golden guests. `abbenden-srv` використовує SSH key і sudo
 з паролем без blanket `NOPASSWD`. `jenkins-srv` не має широкого sudo. Усі LXC

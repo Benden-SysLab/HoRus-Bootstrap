@@ -20,6 +20,7 @@ variables {
   feature_profile        = "storage"
   bootstrap_ssh_key_path = "C:/test/key"
   private_mount_volumes  = ["logs-data", "pg-local:301/subvol-301-disk-0.subvol"]
+  private_mount_sizes    = ["0", "8G"]
   private_mounts = [
     {
       datastore_id = "logs-data"
@@ -53,8 +54,8 @@ run "two_phase_final_node_clone_and_managed_private_volume" {
     error_message = "Private state must use a Proxmox-managed directory volume with canonical zero-size representation."
   }
   assert {
-    condition     = proxmox_virtual_environment_container.lxc_node.mount_point[1].volume == "pg-local:301/subvol-301-disk-0.subvol"
-    error_message = "An adopted existing mount must retain its fully qualified volume ID."
+    condition     = proxmox_virtual_environment_container.lxc_node.mount_point[1].volume == "pg-local:301/subvol-301-disk-0.subvol" && proxmox_virtual_environment_container.lxc_node.mount_point[1].size == "8G"
+    error_message = "An adopted existing mount must retain its fully qualified volume ID and explicit size."
   }
   assert {
     condition     = terraform_data.placement.input.target_node == "horus-pmx-node04" && terraform_data.placement.input.start_on_boot

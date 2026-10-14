@@ -27,8 +27,9 @@ locals {
 
   # Private storages normally allocate one Proxmox-managed volume per workload.
   # A size of 0 creates a managed directory on a directory/NFS backend. The
-  # PostgreSQL entry is the explicit exception: it adopts an existing local
-  # Proxmox volume by its complete volume ID.
+  # PostgreSQL data and backup volumes are provider-allocated on their approved
+  # datastores. The backup must not reuse storage-infra disk-0 because the
+  # two-phase clone uses that ID for the temporary rootfs of VMID 301.
   storage_inventory = {
     "guardian-data" = {
       category          = "private"
@@ -55,8 +56,14 @@ locals {
       category          = "private"
       datastore_id      = "pg-local"
       physical_owner    = "horus-pmx-node03"
-      existing_volume   = "pg-local:301/subvol-301-disk-0.subvol"
       terraform_managed = false
+    }
+    "infra-backup" = {
+      category            = "private"
+      datastore_id        = "storage-infra"
+      physical_owner      = "horus-pmx-node03"
+      managed_volume_size = "8G"
+      terraform_managed   = false
     }
     "artifacts-data" = {
       category          = "private"
@@ -110,7 +117,7 @@ locals {
     "horus-k8sw-srv02"  = { vmid = 208, hostname = "horus-k8sw-srv02", type = "vm", target_node = "horus-pmx-node02", cores = 3, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-k8sw-srv02"], vlan_id = 180 }
     "horus-k8sc-srv01"  = { vmid = 209, hostname = "horus-k8sc-srv01", type = "vm", target_node = "horus-pmx-node02", cores = 2, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-k8sc-srv01"], vlan_id = 180 }
 
-    "horus-db-srv03"   = { vmid = 301, hostname = "horus-db-srv03", type = "lxc", target_node = "horus-pmx-node03", cores = 2, memory = 2560, disk_size = "16", ip_address = var.environment.workload_ips["horus-db-srv03"], vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "infra-data", volume = local.storage_inventory["postgres-local"].existing_volume, path = var.environment.guest_paths["infra-postgres"], size = "0" }] }
+    "horus-db-srv03"   = { vmid = 301, hostname = "horus-db-srv03", type = "lxc", target_node = "horus-pmx-node03", cores = 2, memory = 2560, disk_size = "16", ip_address = var.environment.workload_ips["horus-db-srv03"], vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "postgres-local", path = var.environment.guest_paths["infra-postgres"], size = "0" }, { storage_name = "infra-backup", path = var.environment.guest_paths["infra-backups"], size = local.storage_inventory["infra-backup"].managed_volume_size }] }
     "horus-vlt-srv01"  = { vmid = 302, hostname = "horus-vlt-srv01", type = "vm", target_node = "horus-pmx-node03", cores = 2, memory = 1536, disk_size = "16", ip_address = var.environment.workload_ips["horus-vlt-srv01"], vlan_id = 101 }
     "horus-wiki-srv01" = { vmid = 303, hostname = "horus-wiki-srv01", type = "lxc", target_node = "horus-pmx-node03", cores = 1, memory = 768, disk_size = "12", ip_address = var.environment.workload_ips["horus-wiki-srv01"], vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "infra-data", path = var.environment.guest_paths["infra-wiki"], size = "0" }] }
     "horus-git-srv01"  = { vmid = 304, hostname = "horus-git-srv01", type = "lxc", target_node = "horus-pmx-node03", cores = 2, memory = 1536, disk_size = "12", ip_address = var.environment.workload_ips["horus-git-srv01"], vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "infra-data", path = var.environment.guest_paths["infra-gitea"], size = "0" }] }
@@ -233,7 +240,14 @@ check "storage_boundaries" {
       alltrue([for mount in local.private_mounts : (
         try(local.storage_inventory[mount.storage_name].category, "") == "private" &&
         local.storage_inventory[mount.storage_name].physical_owner == mount.target_node &&
-        mount.size == "0"
+        (
+          mount.size == "0" ||
+          (
+            try(mount.volume, null) == null &&
+            mount.size == try(local.storage_inventory[mount.storage_name].managed_volume_size, null) &&
+            can(regex("^[1-9][0-9]*[KMGT]$", mount.size))
+          )
+        )
       )]) &&
       alltrue([for mount in local.shared_mounts : (
         try(local.storage_inventory[mount.storage_name].category, "") == "shared" &&

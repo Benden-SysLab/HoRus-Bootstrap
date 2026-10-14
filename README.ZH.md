@@ -10,15 +10,15 @@
 
 ## 状态
 
-当前 desired state 已部署并达到收敛状态。更新后的
-`terraform plan -parallelism=1` 返回：
+当前 desired state 已部署并达到收敛状态。DB03 storage 恢复后的
+`terraform plan -parallelism=5` 返回：
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-这独立确认了空的 Workspace VM 已退役，Registry 现在使用 VMID 305。本 release
-workflow 未执行 apply。Provider 固定为 `bpg/proxmox 0.115.0`。
+受控 apply 仅替换了空的 DB03 LXC 及其 placement helper；VM 302 和所有其他
+workloads 均未更改。Provider 固定为 `bpg/proxmox 0.115.0`。
 
 ## 架构
 
@@ -117,16 +117,15 @@ Helper 不执行跨节点迁移、不缩小磁盘，并在状态异常时安全�
 
 Private data 仅属于对应服务：Guardian 位于 Node01，Mimir 和 AI 位于 Node02，
 infrastructure/Registry 位于 Node03，MinIO logs 位于 Node04。
-`horus-db-srv03` 上的 PostgreSQL 17（VMID 301、`horus-pmx-node03`、
-`10.10.1.31/24`、VLAN 101）将 root 保留在 `local-lvm`，并使用
-`pg-local:301/subvol-301-disk-0.subvol`。Guest mount 为
-`/srv/horus/infra/postgres`，`PGDATA` 为
-`/srv/horus/infra/postgres/17/main`。
+`horus-db-srv03` 上的 PostgreSQL 17（VMID 301、Node03、VLAN 101）将 root
+保留在 `local-lvm`。Terraform/provider 在 `pg-local` 上分配 PostgreSQL
+volume，并挂载到 `/srv/horus/infra/postgres`；`PGDATA` 为
+`/srv/horus/infra/postgres/17/main`。`storage-infra` 上另一个 8 GiB volume
+挂载到 `/srv/horus/infra/backups`。
 
-`storage-infra` 是 shared NFS datastore；`pg-local` 是 Node03-local directory
-datastore。Terraform 显式采用现有 volume，不会把 PostgreSQL 迁移到 NFS，也
-不会替换 VMID 301。Shared media 和 artifacts 由后续 Ansible 配置。Guardian AI
-不会获得原始 PostgreSQL 文件。
+Clone lifecycle 为临时 rootfs 保留 `storage-infra` 的 disk index 0，因此
+backup 使用 `storage-infra:301/vm-301-disk-1.raw`。Guardian AI 不会获得原始
+PostgreSQL 文件。
 
 Golden guest 内已禁用 root SSH。`abbenden-srv` 使用 SSH key 和需要密码的
 sudo，不配置广泛的 `NOPASSWD`。`jenkins-srv` 没有广泛 sudo 权限。所有 LXC

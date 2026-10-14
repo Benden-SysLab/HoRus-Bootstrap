@@ -43,13 +43,14 @@ module "lxc_containers" {
   dns_servers       = var.environment.dns_servers
   feature_profile   = try(each.value.feature_profile, "standard")
   private_mounts = [for mount in try(each.value.private_mounts, []) : {
-    datastore_id = local.storage_inventory[mount.storage_name].datastore_id
+    datastore_id = try(split(":", mount.volume)[0], local.storage_inventory[mount.storage_name].datastore_id)
     path         = mount.path
-    size         = mount.size
+    size         = "0"
   }]
   private_mount_volumes = [for mount in try(each.value.private_mounts, []) :
     try(mount.volume, local.storage_inventory[mount.storage_name].datastore_id)
   ]
+  private_mount_sizes    = [for mount in try(each.value.private_mounts, []) : mount.size]
   bootstrap_ssh_key_path = var.bootstrap_ssh_key_path
   allow_lxc_shutdown     = var.allow_lxc_shutdown
 

@@ -77,6 +77,7 @@ environment = {
     mimir-postgres     = "/data/example/mimir-data/postgres"
     mimir-vectors      = "/data/example/mimir-data/vectors"
     infra-postgres     = "/data/example/infra/postgres"
+    infra-backups      = "/data/example/infra/backups"
     infra-wiki         = "/data/example/infra/wiki"
     infra-gitea        = "/data/example/infra/gitea"
     artifacts-registry = "/data/example/artifacts/registry"

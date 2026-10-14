@@ -10,6 +10,10 @@ inventory, placement and logical storage ownership model.
 
 ## Future work
 
+- [ ] After an operator confirms it contains no required data, review and
+  explicitly clean up the DB03 clone-staging `unused0` volume
+  `storage-infra:301/vm-301-disk-0.raw`. It is not the active PostgreSQL or
+  backup volume and must not be removed implicitly by Terraform.
 - [ ] Design an optional pool of immutable Golden LXC replicas/clone lanes for
   parallel first bootstrap. Additional template VMIDs require explicit
   approval and are not part of the current topology.

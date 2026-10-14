@@ -97,7 +97,7 @@ resource "proxmox_virtual_environment_container" "lxc_node" {
       # PVE serializes a zero-sized directory volume as 0T. Provider 0.115.0
       # stores that API string verbatim and marks size ForceNew, so use the
       # read-back representation at the provider boundary to avoid drift.
-      size   = mount_point.value.size == "0" ? "0T" : mount_point.value.size
+      size   = var.private_mount_sizes[mount_point.key] == "0" ? "0T" : var.private_mount_sizes[mount_point.key]
       path   = mount_point.value.path
       backup = true
     }

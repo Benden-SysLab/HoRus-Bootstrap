@@ -61,6 +61,19 @@ variable "private_mount_volumes" {
   }
 }
 
+variable "private_mount_sizes" {
+  type        = list(string)
+  default     = []
+  description = "Provider-facing size for each private mount; placement verification does not resize private volumes"
+  validation {
+    condition = (
+      length(var.private_mount_sizes) == length(var.private_mounts) &&
+      alltrue([for size in var.private_mount_sizes : can(regex("^(0|[1-9][0-9]*[KMGT])$", size))])
+    )
+    error_message = "Each private mount must have one zero or positive Proxmox size."
+  }
+}
+
 variable "bootstrap_ssh_key_path" {
   type        = string
   description = "OpenSSH private-key file path for root access to Proxmox nodes"

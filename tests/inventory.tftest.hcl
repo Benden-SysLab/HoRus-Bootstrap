@@ -76,6 +76,7 @@ variables {
       mimir-postgres     = "/data/example/mimir-data/postgres"
       mimir-vectors      = "/data/example/mimir-data/vectors"
       infra-postgres     = "/data/example/infra/postgres"
+      infra-backups      = "/data/example/infra/backups"
       infra-wiki         = "/data/example/infra/wiki"
       infra-gitea        = "/data/example/infra/gitea"
       artifacts-registry = "/data/example/artifacts/registry"
@@ -127,11 +128,16 @@ run "authoritative_inventory_and_boundaries" {
   assert {
     condition = (
       local.storage_inventory["postgres-local"].datastore_id == "pg-local" &&
-      local.storage_inventory["postgres-local"].existing_volume == "pg-local:301/subvol-301-disk-0.subvol" &&
-      local.workloads["horus-db-srv03"].private_mounts[0].storage_name == "infra-data" &&
-      local.workloads["horus-db-srv03"].private_mounts[0].volume == "pg-local:301/subvol-301-disk-0.subvol"
+      local.storage_inventory["postgres-local"].datastore_id == "pg-local" &&
+      local.workloads["horus-db-srv03"].private_mounts[0].storage_name == "postgres-local" &&
+      !can(local.workloads["horus-db-srv03"].private_mounts[0].volume) &&
+      local.storage_inventory["infra-backup"].managed_volume_size == "8G" &&
+      local.workloads["horus-db-srv03"].private_mounts[1].storage_name == "infra-backup" &&
+      !can(local.workloads["horus-db-srv03"].private_mounts[1].volume) &&
+      local.workloads["horus-db-srv03"].private_mounts[1].path == "/data/example/infra/backups" &&
+      local.workloads["horus-db-srv03"].private_mounts[1].size == "8G"
     )
-    error_message = "PostgreSQL VMID 301 must adopt its existing pg-local volume exactly."
+    error_message = "PostgreSQL VMID 301 must allocate its data and backup volumes on the approved datastores."
   }
   assert {
     condition     = alltrue([for mount in local.shared_mounts : local.storage_inventory[mount.storage_name].category == "shared"]) && length(local.shared_mounts) == 3

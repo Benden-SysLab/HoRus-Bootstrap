@@ -1,5 +1,48 @@
 # HoRus-Bootstrap release notes
 
+## v2.1.1
+
+Release: `v2.1.1`.
+
+### PostgreSQL storage recovery
+
+- Recreated only `horus-db-srv03` (VMID 301) after the explicitly approved
+  empty-database replacement and restored it on `horus-pmx-node03`.
+- Changed the PostgreSQL private mount to a provider-allocated `pg-local`
+  directory volume mounted at `/srv/horus/infra/postgres`. Proxmox reports the
+  resulting volume as `pg-local:301/subvol-301-disk-0.subvol` with canonical
+  size `0T`.
+- Added a separate provider-allocated 8 GiB weekly-backup volume on
+  `storage-infra`, mounted at `/srv/horus/infra/backups`. Its resulting volume
+  ID is `storage-infra:301/vm-301-disk-1.raw`.
+- Kept the LXC rootfs on `local-lvm`, the container running and `onboot=1`.
+  VM 302 and every unrelated workload were unchanged.
+
+### Why the requested disk-0 was not attached
+
+`storage-infra:301/vm-301-disk-0.raw` belongs to the two-phase LXC clone path:
+it is the temporary full-clone rootfs before the placement helper moves rootfs
+to Node03 `local-lvm`. Reusing that volume as a private backup mount conflicts
+with the clone lifecycle. The final backup mount is therefore a distinct
+provider-owned `disk-1`. The remaining `unused0` staging entry is not used for
+PostgreSQL or backups and was not manually deleted by this release.
+
+### Terraform contract and validation
+
+- Storage inventory now distinguishes externally referenced volumes from
+  provider-allocated private mounts with an approved positive size.
+- The LXC module receives provider-facing private-mount sizes while the
+  placement verifier continues to validate final mount paths, datastores and
+  volume identities without taking ownership of allocation.
+- `terraform fmt -check -recursive`: passed.
+- `terraform validate`: passed.
+- `terraform test`: 5 passed, 0 failed.
+- Offline LXC placement tests: 7 passed.
+- Recovery apply: `2 added, 0 changed, 2 destroyed`, limited to CT 301 and its
+  placement helper.
+- Refreshed steady-state plan: `No changes. Your infrastructure matches the
+  configuration.`
+
 ## v2.1.0
 
 Release: `v2.1.0`.

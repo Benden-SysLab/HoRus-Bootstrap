@@ -184,21 +184,25 @@ Proxmox-managed storage-backed LXC mount points on the physical owner node.
 |---|---|---|---|
 | `guardian-data` | Node01 | `/private/environment/path` | Guardian PostgreSQL |
 | `mimir-data` | Node02 | `/private/environment/path` | Mimir, AI PostgreSQL, Qdrant |
-| `pg-local` | Node03 | existing Proxmox volume | infrastructure PostgreSQL VMID 301 |
-| `storage-infra` | Node03 | `/private/environment/path` | Wiki, Gitea; also Golden 9001 clone storage |
+| `pg-local` | Node03 | `/private/environment/path` | infrastructure PostgreSQL VMID 301 |
+| `storage-infra` | Node03 | `/private/environment/path` | Wiki, Gitea, DB03 weekly backup; also Golden 9001 clone storage |
 | `artifacts-data` | Node03 | `/private/environment/path` | OCI Registry |
 | `logs-data` | Node04 | `/private/environment/path` | MinIO |
 
 Terraform sets `create_base_path = false` for managed directory storages, so a
 missing physical mount is not silently replaced by an ordinary directory.
-PostgreSQL 17 on `horus-db-srv03` (VMID 301, Node03, `10.10.1.31/24`, VLAN 101)
-keeps its root on `local-lvm`. Its persistent guest mount
-`/srv/horus/infra/postgres` adopts the existing volume
-`pg-local:301/subvol-301-disk-0.subvol`; `PGDATA` is
-`/srv/horus/infra/postgres/17/main`. Terraform references the complete volume
-ID and does not allocate, migrate or replace it. `storage-infra` is shared NFS;
-`pg-local` is a Node03-local directory datastore. PostgreSQL is not moved back
-to NFS.
+PostgreSQL 17 on `horus-db-srv03` (VMID 301, Node03, VLAN 101) keeps its root
+on `local-lvm`. Terraform/provider allocates its directory volume on
+`pg-local` and mounts it at `/srv/horus/infra/postgres`; `PGDATA` is
+`/srv/horus/infra/postgres/17/main`. A separate provider-allocated 8 GiB
+volume on shared `storage-infra` is mounted at
+`/srv/horus/infra/backups` for weekly backups.
+
+The two-phase clone initially consumes `storage-infra` disk index 0 as its
+temporary rootfs before moving rootfs to `local-lvm`. Consequently private
+storage allocation starts after that clone-owned index; the DB03 backup is
+`storage-infra:301/vm-301-disk-1.raw`. The placement helper verifies the final
+mounts but does not allocate or format them.
 
 Shared media and build artifacts are a separate category. Terraform emits
 their consumer metadata, while Ansible/service automation later configures NFS

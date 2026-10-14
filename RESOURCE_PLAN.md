@@ -29,8 +29,10 @@ Private owners:
 
 - Guardian PostgreSQL -> `guardian-data`, Node01;
 - Mimir state/PostgreSQL/Qdrant -> `mimir-data`, Node02;
-- infrastructure PostgreSQL 17, VMID 301 -> adopted existing
+- infrastructure PostgreSQL 17, VMID 301 -> provider-allocated
   `pg-local:301/subvol-301-disk-0.subvol`, Node03-local directory datastore;
+- infrastructure PostgreSQL weekly backups -> provider-allocated 8 GiB
+  `storage-infra:301/vm-301-disk-1.raw`, shared NFS datastore;
 - Wiki/Gitea -> existing `storage-infra`, Node03;
 - OCI Registry -> `artifacts-data`, Node03;
 - MinIO -> `logs-data`, Node04.
@@ -43,10 +45,10 @@ Shared guest-NFS consumers:
 Guardian AI has no Guardian PostgreSQL raw-data volume. Shared trees are not
 re-owned by Terraform.
 
-PostgreSQL keeps its root on `local-lvm`, mounts the adopted volume at
+PostgreSQL keeps its root on `local-lvm`, mounts the `pg-local` volume at
 `/srv/horus/infra/postgres`, and uses
-`/srv/horus/infra/postgres/17/main` as `PGDATA`. `storage-infra` is the shared
-NFS datastore and is not the target for this PostgreSQL volume.
+`/srv/horus/infra/postgres/17/main` as `PGDATA`. Its separate weekly-backup
+volume is mounted from `storage-infra` at `/srv/horus/infra/backups`.
 
 ## Security scanner ownership
 

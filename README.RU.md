@@ -10,16 +10,15 @@ English documentation: [README.md](README.md). Подробная архитек
 
 ## Статус
 
-Текущее desired state развёрнуто и приведено к сходящемуся состоянию. Refreshed
-`terraform plan -parallelism=1` вернул:
+Текущее desired state развёрнуто и приведено к сходящемуся состоянию. После
+восстановления storage DB03 `terraform plan -parallelism=5` вернул:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Это независимо подтверждает, что пустая Workspace VM выведена из эксплуатации,
-а Registry теперь использует VMID 305. В рамках этого release workflow
-инфраструктура не применялась. Используется фиксированная версия
+Controlled apply заменил только пустой LXC DB03 и его placement helper; VM 302
+и все остальные workloads не изменялись. Используется фиксированная версия
 `bpg/proxmox 0.115.0`.
 
 ## Обзор архитектуры
@@ -199,7 +198,8 @@ data.
 |---|---|---|
 | Guardian PostgreSQL | Node01 / `horus-db-srv01` | `guardian-data` |
 | Mimir, AI PostgreSQL, Qdrant | Node02 / соответствующие workloads | `mimir-data` |
-| Infrastructure PostgreSQL | Node03 / `horus-db-srv03` | существующий volume `pg-local` |
+| Infrastructure PostgreSQL | Node03 / `horus-db-srv03` | provider-allocated volume `pg-local` |
+| Weekly backups PostgreSQL | Node03 / `horus-db-srv03` | provider-allocated volume 8 GiB на `storage-infra` |
 | Wiki, Gitea | Node03 / соответствующие workloads | `storage-infra` |
 | OCI Registry | Node03 / `horus-reg-srv01` | `artifacts-data` |
 | MinIO | Node04 / `horus-s3-srv01` | `logs-data` |
@@ -210,17 +210,16 @@ ignored `terraform.tfvars`.
 Terraform объявляет `guardian-data`, `mimir-data`, `artifacts-data` и
 `logs-data` только поверх уже смонтированных физических roots и использует
 `create_base_path = false`. PostgreSQL 17 на `horus-db-srv03` (VMID 301,
-`horus-pmx-node03`, `10.10.1.31/24`, VLAN 101) сохраняет root на `local-lvm` и
-использует существующий persistent volume
-`pg-local:301/subvol-301-disk-0.subvol`. Он смонтирован в
-`/srv/horus/infra/postgres`, а `PGDATA` —
-`/srv/horus/infra/postgres/17/main`.
+Node03, VLAN 101) сохраняет root на `local-lvm`. Terraform/provider выделяет
+PostgreSQL volume на `pg-local` и монтирует его в
+`/srv/horus/infra/postgres`; `PGDATA` —
+`/srv/horus/infra/postgres/17/main`. Отдельный provider-allocated volume 8 GiB
+на `storage-infra` монтируется в `/srv/horus/infra/backups`.
 
-`storage-infra` — shared NFS datastore для Golden 9001 и других private
-volumes Node03. `pg-local` — локальный directory datastore Node03 для
-существующего PostgreSQL volume. Явное Terraform-представление устраняет
-storage drift без миграции PostgreSQL на NFS и без замены VMID 301. Guardian AI
-не получает raw PostgreSQL files.
+Clone lifecycle резервирует disk index 0 на `storage-infra` под временный
+rootfs, поэтому backup использует отдельный
+`storage-infra:301/vm-301-disk-1.raw`. Guardian AI не получает raw PostgreSQL
+files.
 
 Shared media и build artifacts описаны отдельно как metadata для будущей
 guest-level NFS configuration. Bootstrap не настраивает приложения, не

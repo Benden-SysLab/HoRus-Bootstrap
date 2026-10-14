@@ -12,16 +12,16 @@ Les adresses de management et des workloads, les CIDR et gateways VLAN, les endp
 
 ## État
 
-Le desired state actuel est déployé et convergé. Un
-`terraform plan -parallelism=1` actualisé a retourné :
+Le desired state actuel est déployé et convergé. Après la récupération du
+storage DB03, `terraform plan -parallelism=5` a retourné :
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Cela vérifie indépendamment que la VM Workspace vide est retirée et que Registry
-utilise désormais le VMID 305. Ce workflow de release n'a exécuté aucun apply.
-Provider utilisé : `bpg/proxmox 0.115.0`.
+L'apply contrôlé n'a remplacé que le LXC DB03 vide et son placement helper ; VM
+302 et tous les autres workloads sont restés inchangés. Provider utilisé :
+`bpg/proxmox 0.115.0`.
 
 ## Architecture
 
@@ -124,17 +124,16 @@ exactement `started`, `disk[0].datastore_id` et `disk[0].size`.
 
 Les données privées restent affectées à un seul service : Guardian sur Node01,
 Mimir et AI sur Node02, infrastructure/Registry sur Node03 et logs MinIO sur
-Node04. PostgreSQL 17 sur `horus-db-srv03` (VMID 301,
-`horus-pmx-node03`, `10.10.1.31/24`, VLAN 101) conserve son root sur
-`local-lvm` et utilise `pg-local:301/subvol-301-disk-0.subvol`. Le mount guest
-est `/srv/horus/infra/postgres` et `PGDATA` vaut
-`/srv/horus/infra/postgres/17/main`.
+Node04. PostgreSQL 17 sur `horus-db-srv03` (VMID 301, Node03, VLAN 101)
+conserve son root sur `local-lvm`. Terraform/provider alloue le volume
+PostgreSQL sur `pg-local` et le monte dans `/srv/horus/infra/postgres` ;
+`PGDATA` vaut `/srv/horus/infra/postgres/17/main`. Un volume séparé de 8 GiB
+sur `storage-infra` est monté dans `/srv/horus/infra/backups`.
 
-`storage-infra` est le datastore NFS partagé ; `pg-local` est un datastore
-directory local à Node03. Terraform adopte le volume existant sans migrer
-PostgreSQL vers NFS ni remplacer VMID 301. Les médias et artifacts partagés
-seront configurés par Ansible. Guardian AI ne reçoit aucun fichier PostgreSQL
-brut.
+Le lifecycle de clone réserve l'index disque 0 sur `storage-infra` pour le
+rootfs temporaire. Le backup utilise donc
+`storage-infra:301/vm-301-disk-1.raw`. Guardian AI ne reçoit aucun fichier
+PostgreSQL brut.
 
 Le SSH root est désactivé dans les Golden guests. `abbenden-srv` utilise une
 clé SSH et sudo avec mot de passe, sans `NOPASSWD` global. `jenkins-srv` ne

@@ -12,16 +12,16 @@
 
 ## ステータス
 
-現在の desired state はデプロイ済みで収束しています。更新した
-`terraform plan -parallelism=1` の結果は次のとおりです。
+現在の desired state はデプロイ済みで収束しています。DB03 storage recovery
+後の `terraform plan -parallelism=5` の結果は次のとおりです。
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-これにより、空の Workspace VM が廃止され、Registry が VMID 305 を使用して
-いることを独立に確認しました。この release workflow では apply を実行して
-いません。Provider は `bpg/proxmox 0.115.0` に固定されています。
+Controlled apply が置換したのは空の DB03 LXC と placement helper のみです。
+VM 302 とその他すべての workloads は変更されていません。Provider は
+`bpg/proxmox 0.115.0` に固定されています。
 
 ## アーキテクチャ
 
@@ -123,16 +123,15 @@ Helper はノード間 migration を行わず、ディスクを縮小せず、�
 
 Private data は単一サービスに帰属します。Guardian は Node01、Mimir と AI は
 Node02、infrastructure/Registry は Node03、MinIO logs は Node04 です。
-`horus-db-srv03` の PostgreSQL 17（VMID 301、`horus-pmx-node03`、
-`10.10.1.31/24`、VLAN 101）は root を `local-lvm` に保持し、
-`pg-local:301/subvol-301-disk-0.subvol` を使用します。Guest mount は
-`/srv/horus/infra/postgres`、`PGDATA` は
-`/srv/horus/infra/postgres/17/main` です。
+`horus-db-srv03` の PostgreSQL 17（VMID 301、Node03、VLAN 101）は root を
+`local-lvm` に保持します。Terraform/provider は PostgreSQL volume を
+`pg-local` に割り当て、`/srv/horus/infra/postgres` に mount します。`PGDATA`
+は `/srv/horus/infra/postgres/17/main` です。`storage-infra` 上の別の 8 GiB
+volume は `/srv/horus/infra/backups` に mount されます。
 
-`storage-infra` は shared NFS datastore、`pg-local` は Node03-local directory
-datastore です。Terraform は既存 volume を表現し、PostgreSQL を NFS へ移動
-せず VMID 301 も置換しません。Shared media と artifacts は後続の Ansible が
-設定します。Guardian AI に PostgreSQL の raw files は渡しません。
+Clone lifecycle は一時 rootfs 用に `storage-infra` の disk index 0 を予約する
+ため、backup は `storage-infra:301/vm-301-disk-1.raw` を使用します。
+Guardian AI に PostgreSQL の raw files は渡しません。
 
 Golden guest では root SSH を無効化しています。`abbenden-srv` は SSH key と
 パスワード付き sudo を使用し、包括的な `NOPASSWD` はありません。
