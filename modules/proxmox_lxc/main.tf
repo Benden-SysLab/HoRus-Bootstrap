@@ -91,7 +91,9 @@ resource "proxmox_virtual_environment_container" "lxc_node" {
   dynamic "mount_point" {
     for_each = var.private_mounts
     content {
-      volume = mount_point.value.datastore_id
+      # A datastore ID allocates a new volume. A fully qualified ID adopts an
+      # existing volume and round-trips unchanged through provider 0.115.0.
+      volume = var.private_mount_volumes[mount_point.key]
       # PVE serializes a zero-sized directory volume as 0T. Provider 0.115.0
       # stores that API string verbatim and marks size ForceNew, so use the
       # read-back representation at the provider boundary to avoid drift.

@@ -49,7 +49,6 @@ variables {
       horus-vlt-srv01   = "198.51.100.9/28"
       horus-wiki-srv01  = "198.51.100.10/28"
       horus-git-srv01   = "198.51.100.11/28"
-      horus-work-srv01  = "198.51.100.12/28"
       horus-reg-srv01   = "198.51.100.13/28"
       horus-grf-srv01   = "198.51.100.84/28"
       horus-pm-srv01    = "198.51.100.85/28"
@@ -95,8 +94,8 @@ run "authoritative_inventory_and_boundaries" {
   command = plan
 
   assert {
-    condition     = length(local.workloads) == 29 && length(local.lxc_workloads) == 22 && length(local.vm_workloads) == 7
-    error_message = "Expected 29 workloads: 22 LXC and 7 VM."
+    condition     = length(local.workloads) == 28 && length(local.lxc_workloads) == 22 && length(local.vm_workloads) == 6
+    error_message = "Expected 28 workloads: 22 LXC and 6 VM."
   }
   assert {
     condition = {
@@ -104,7 +103,7 @@ run "authoritative_inventory_and_boundaries" {
       } == {
       "horus-pmx-node01" = 8
       "horus-pmx-node02" = 9
-      "horus-pmx-node03" = 6
+      "horus-pmx-node03" = 5
       "horus-pmx-node04" = 6
     }
     error_message = "Per-node workload counts changed."
@@ -126,6 +125,15 @@ run "authoritative_inventory_and_boundaries" {
     error_message = "Private database data is exposed to an unrelated workload."
   }
   assert {
+    condition = (
+      local.storage_inventory["postgres-local"].datastore_id == "pg-local" &&
+      local.storage_inventory["postgres-local"].existing_volume == "pg-local:301/subvol-301-disk-0.subvol" &&
+      local.workloads["horus-db-srv03"].private_mounts[0].storage_name == "infra-data" &&
+      local.workloads["horus-db-srv03"].private_mounts[0].volume == "pg-local:301/subvol-301-disk-0.subvol"
+    )
+    error_message = "PostgreSQL VMID 301 must adopt its existing pg-local volume exactly."
+  }
+  assert {
     condition     = alltrue([for mount in local.shared_mounts : local.storage_inventory[mount.storage_name].category == "shared"]) && length(local.shared_mounts) == 3
     error_message = "Shared media/artifacts must remain guest-level NFS metadata."
   }
@@ -134,15 +142,21 @@ run "authoritative_inventory_and_boundaries" {
     error_message = "Legacy network/storage names remain."
   }
   assert {
-    condition     = !contains(keys(local.workloads), "horus-ai-srv04") && !contains([for workload in values(local.workloads) : workload.vmid], 307)
-    error_message = "Retired workload horus-ai-srv04 or reserved VMID 307 returned."
+    condition = (
+      !contains(keys(local.workloads), "horus-ai-srv04") &&
+      !contains(keys(local.workloads), "horus-work-srv01") &&
+      local.workloads["horus-reg-srv01"].vmid == 305 &&
+      !contains([for workload in values(local.workloads) : workload.vmid], 306) &&
+      !contains([for workload in values(local.workloads) : workload.vmid], 307)
+    )
+    error_message = "Retired workloads returned or OCI Registry did not take approved VMID 305."
   }
   assert {
-    condition     = local.local_lvm_logical_root_gib["horus-pmx-node01"] == 140 && local.local_lvm_logical_root_gib["horus-pmx-node02"] == 136 && local.local_lvm_logical_root_gib["horus-pmx-node03"] == 100 && local.local_lvm_logical_root_gib["horus-pmx-node04"] == 78
+    condition     = local.local_lvm_logical_root_gib["horus-pmx-node01"] == 140 && local.local_lvm_logical_root_gib["horus-pmx-node02"] == 136 && local.local_lvm_logical_root_gib["horus-pmx-node03"] == 84 && local.local_lvm_logical_root_gib["horus-pmx-node04"] == 78
     error_message = "Capacity arithmetic changed."
   }
   assert {
-    condition     = length(local.nodes) == 4 && length(local.vlans) == 9 && length(local.workloads) == 29
+    condition     = length(local.nodes) == 4 && length(local.vlans) == 9 && length(local.workloads) == 28
     error_message = "Extra environment mappings must not create topology objects."
   }
   assert {

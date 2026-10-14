@@ -1,8 +1,8 @@
 # HoRus-Bootstrap
 
 Terraform-bootstrap перебудованого чотиривузлового кластера HoRus Proxmox VE.
-Репозиторій керує 29 workloads: 22 непривілейованими LXC-контейнерами і
-7 віртуальними машинами.
+Репозиторій керує 28 workloads: 22 непривілейованими LXC-контейнерами і
+6 віртуальними машинами.
 
 Повна довідка: [README.md](README.md). Детальна архітектура:
 [ARCHITECTURE.md](ARCHITECTURE.md). Авторитетна топологія:
@@ -12,13 +12,15 @@ Environment-specific management/workload адреси, VLAN CIDR і gateway, NFS
 
 ## Стан
 
-Поточну топологію успішно розгорнуто та приведено до збіжного стану. Після
-bootstrap команда `terraform plan -parallelism=5` повернула:
+Поточний desired state розгорнуто та приведено до збіжного стану. Оновлений
+`terraform plan -parallelism=1` повернув:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
+Це незалежно підтверджує, що порожню Workspace VM виведено з експлуатації, а
+Registry тепер використовує VMID 305. Цей release workflow не виконував apply.
 Зафіксована версія provider: `bpg/proxmox 0.115.0`.
 
 ## Архітектура
@@ -32,9 +34,12 @@ local.workloads
   `-- module.lxc_containers   (for_each)
 ```
 
-Terraform відповідає за ідентичність та інфраструктурне розміщення. Ansible і
-майбутній сервісний шар відповідають за пакети, сервіси, користувачів, права на
-дані всередині guests і guest-level NFS mounts.
+HoRus-Bootstrap/Terraform відповідає за lifecycle Proxmox, топологію VM/LXC,
+storage attachments та infrastructure resources. HoRus-Basis/Ansible відповідає
+за guest OS, пакети й сервіси. Argo CD призначено лише для майбутнього
+Kubernetes GitOps; він не керує Proxmox VM/LXC і ще не розгорнутий.
+`horus-work-srv01` виведено з експлуатації; KasmVNC і code-server не є активними
+сервісами. Розробка та CAD залишаються на особистому ноутбуці оператора.
 
 ## Фізичний кластер
 
@@ -70,11 +75,14 @@ Kubernetes: Pod CIDR `private`, Service CIDR `private`.
 |---|---|---|---:|
 | Node01 | 101 `horus-lb-srv01`, 102 `horus-agent-srv01`, 104 `horus-ai-srv01`, 105 `horus-db-srv01`, 108 `horus-gg-srv01` | 103 `horus-jnk-srv01`, 106 `horus-media-srv01`, 107 `horus-k8sw-srv01` | 8 |
 | Node02 | 201 `horus-ans-srv01`, 202 `horus-ai-srv02`, 203 `horus-db-srv02`, 204 `horus-vec-srv01`, 205 `horus-cache-srv01`, 206 `horus-iam-srv01`, 207 `horus-media-srv02` | 208 `horus-k8sw-srv02`, 209 `horus-k8sc-srv01` | 9 |
-| Node03 | 301 `horus-db-srv03`, 303 `horus-wiki-srv01`, 304 `horus-git-srv01`, 306 `horus-reg-srv01` | 302 `horus-vlt-srv01`, 305 `horus-work-srv01` | 6 |
+| Node03 | 301 `horus-db-srv03`, 303 `horus-wiki-srv01`, 304 `horus-git-srv01`, 305 `horus-reg-srv01` | 302 `horus-vlt-srv01` | 5 |
 | Node04 | 401 `horus-grf-srv01`, 402 `horus-pm-srv01`, 403 `horus-lok-srv01`, 404 `horus-otel-srv01`, 405 `horus-s3-srv01`, 406 `horus-ai-srv03` | — | 6 |
-| **Разом** | **22 LXC** | **7 VM** | **29** |
+| **Разом** | **22 LXC** | **6 VM** | **28** |
 
-VMID 307 зарезервовано; Terraform його не створює.
+VMID 306-307 зарезервовано; Terraform їх не створює. Registry визначено як
+`horus-reg-srv01`, VMID 305 (раніше 306), на `horus-pmx-node03`, з
+`10.10.1.36/24`, VLAN 101, root `local-lvm` і persistent storage
+`artifacts-data`. Контрольовану заміну підтверджено оновленим converged plan.
 
 Node01 використовує VMID 101-108. `horus-gg-srv01` (VMID 108, LXC, VLAN 150) — ізольований scanner GitGuardian CLI/ggshield, TruffleHog і Trivy. Terraform створює і розміщує LXC, переносить rootfs до `local-lvm`, запускає його та вмикає `start_on_boot`; Ansible/service automation встановлює й налаштовує scanners, розклад, credentials та CI integration. Node01: 20 vCPU, 26 GiB RAM і 140 GiB logical roots на 130.27 GiB фізичного `local-lvm` (thin provisioning ≈1.07x).
 
@@ -113,9 +121,17 @@ Helper не мігрує контейнери між вузлами, нікол�
 ## Storage і безпека
 
 Private data належать одному сервісу: Guardian на Node01, Mimir та AI на
-Node02, infrastructure/Registry на Node03, MinIO logs на Node04. Shared media
-та artifacts пізніше налаштовуються як NFS усередині guests через Ansible.
-Guardian AI не отримує raw PostgreSQL files.
+Node02, infrastructure/Registry на Node03, MinIO logs на Node04. PostgreSQL 17
+на `horus-db-srv03` (VMID 301, `horus-pmx-node03`, `10.10.1.31/24`, VLAN 101)
+зберігає root на `local-lvm` і використовує
+`pg-local:301/subvol-301-disk-0.subvol`. Guest mount:
+`/srv/horus/infra/postgres`; `PGDATA`:
+`/srv/horus/infra/postgres/17/main`.
+
+`storage-infra` — shared NFS datastore; `pg-local` — локальний directory
+datastore Node03. Terraform представляє наявний volume без міграції PostgreSQL
+на NFS і без заміни VMID 301. Shared media та artifacts пізніше налаштовує
+Ansible. Guardian AI не отримує raw PostgreSQL files.
 
 Root SSH вимкнено в Golden guests. `abbenden-srv` використовує SSH key і sudo
 з паролем без blanket `NOPASSWD`. `jenkins-srv` не має широкого sudo. Усі LXC

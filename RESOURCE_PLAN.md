@@ -1,7 +1,7 @@
 # HoRus resource and capacity plan
 
-Authoritative topology: 29 workloads, 22 LXC and 7 VM. Node totals are
-8 / 9 / 6 / 6. LXC roots must be at
+Authoritative topology: 28 workloads, 22 LXC and 6 VM. Node totals are
+8 / 9 / 5 / 6. LXC roots must be at
 least the Golden 9001 baseline of 8 GiB; VM roots must be at least the Golden
 9000 baseline of 12 GiB. Grafana VMID 401 remains valid at 10 GiB.
 
@@ -14,7 +14,7 @@ filled roots exceed physical capacity on all four nodes.
 |---|---:|---:|---:|---:|---:|
 | Node01 | 130.27 | 140 | 0 | 140 | 1.07x |
 | Node02 | 49.34 | 136 | 0 | 136 | 2.76x |
-| Node03 | 53.93 | 88 | 12 (VM 9000) | 100 | 1.85x |
+| Node03 | 53.93 | 72 | 12 (VM 9000) | 84 | 1.56x |
 | Node04 | 53.93 | 78 | 0 | 78 | 1.45x |
 
 Node01 now has a small reviewed thin-provisioning overcommit. Its eight
@@ -29,7 +29,9 @@ Private owners:
 
 - Guardian PostgreSQL -> `guardian-data`, Node01;
 - Mimir state/PostgreSQL/Qdrant -> `mimir-data`, Node02;
-- infrastructure PostgreSQL/Wiki/Gitea -> existing `storage-infra`, Node03;
+- infrastructure PostgreSQL 17, VMID 301 -> adopted existing
+  `pg-local:301/subvol-301-disk-0.subvol`, Node03-local directory datastore;
+- Wiki/Gitea -> existing `storage-infra`, Node03;
 - OCI Registry -> `artifacts-data`, Node03;
 - MinIO -> `logs-data`, Node04.
 
@@ -40,6 +42,11 @@ Shared guest-NFS consumers:
 
 Guardian AI has no Guardian PostgreSQL raw-data volume. Shared trees are not
 re-owned by Terraform.
+
+PostgreSQL keeps its root on `local-lvm`, mounts the adopted volume at
+`/srv/horus/infra/postgres`, and uses
+`/srv/horus/infra/postgres/17/main` as `PGDATA`. `storage-infra` is the shared
+NFS datastore and is not the target for this PostgreSQL volume.
 
 ## Security scanner ownership
 

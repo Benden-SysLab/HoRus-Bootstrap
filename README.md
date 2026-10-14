@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Terraform bootstrap for the rebuilt four-node HoRus Proxmox VE cluster. The
-repository manages 29 workloads—22 unprivileged LXC containers and 7 virtual
+repository manages 28 workloads—22 unprivileged LXC containers and 6 virtual
 machines—together with their placement, compute, network and private storage
 attachments.
 
@@ -10,16 +10,16 @@ Russian documentation: [README.RU.md](README.RU.md). Detailed design:
 
 ## Status
 
-The current topology has been deployed and converged. After the completed
-bootstrap, `terraform plan -parallelism=5` returned:
+The current desired topology is deployed and converged. A refreshed
+`terraform plan -parallelism=1` returned:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-This confirms convergence between Terraform state, provider-managed resources,
-the LXC placement helper and the actual Proxmox configuration. The provider is
-pinned to `bpg/proxmox 0.115.0`.
+This independently verifies that the empty Workspace VM is retired and Registry
+is now VMID 305. No infrastructure was applied by this release workflow. The
+provider is pinned to `bpg/proxmox 0.115.0`.
 
 ## Architecture overview
 
@@ -32,9 +32,15 @@ local.workloads
   `-- module.lxc_containers   (for_each)
 ```
 
-Terraform owns infrastructure placement and identity. A later Ansible/service
-layer owns packages, services, application users, data ownership inside guests
-and guest-level shared-data mounts.
+HoRus-Bootstrap and Terraform own Proxmox infrastructure lifecycle, VM/LXC
+topology, storage attachments and infrastructure resources. HoRus-Basis and
+Ansible own guest OS configuration, packages and services. Argo CD is reserved
+for future Kubernetes GitOps only; it does not manage Proxmox VM/LXC resources
+and is not documented as deployed.
+
+The dedicated `horus-work-srv01` Workspace is retired. KasmVNC and code-server
+are not active HoRus services; development and CAD remain on the operator's
+personal laptop.
 
 ## Physical cluster
 
@@ -96,8 +102,7 @@ private network design rather than documented in this public repository.
 | Node03 | 302 | VM | `horus-vlt-srv01` | 101 |
 | Node03 | 303 | LXC | `horus-wiki-srv01` | 101 |
 | Node03 | 304 | LXC | `horus-git-srv01` | 101 |
-| Node03 | 305 | VM | `horus-work-srv01` | 101 |
-| Node03 | 306 | LXC | `horus-reg-srv01` | 101 |
+| Node03 | 305 | LXC | `horus-reg-srv01` | 101 |
 | Node04 | 401 | LXC | `horus-grf-srv01` | 150 |
 | Node04 | 402 | LXC | `horus-pm-srv01` | 150 |
 | Node04 | 403 | LXC | `horus-lok-srv01` | 150 |
@@ -105,8 +110,12 @@ private network design rather than documented in this public repository.
 | Node04 | 405 | LXC | `horus-s3-srv01` | 150 |
 | Node04 | 406 | LXC | `horus-ai-srv03` | 150 |
 
-Node totals are 8 / 9 / 6 / 6. Node01 uses VMIDs 101-108. VMID 307 is reserved and is not created by
-Terraform.
+Node totals are 8 / 9 / 5 / 6. Node01 uses VMIDs 101-108. VMIDs 306-307 are
+reserved and are not created by Terraform. Registry is desired as
+`horus-reg-srv01`, VMID 305 (previously 306), on `horus-pmx-node03`, at
+`10.10.1.36/24` on VLAN 101, with a `local-lvm` root and `artifacts-data`
+persistent storage. The reassignment required a controlled replacement and is
+now verified converged by the refreshed plan.
 
 `horus-gg-srv01` is the isolated GitGuardian CLI/ggshield, TruffleHog and
 Trivy security scanner. Terraform creates the LXC, sets its identity, compute,
@@ -187,7 +196,8 @@ mount-point volumes. It is not shared application data.
 |---|---|---|
 | Guardian PostgreSQL | Node01 / `horus-db-srv01` | `guardian-data` |
 | Mimir, AI PostgreSQL, Qdrant | Node02 / respective workloads | `mimir-data` |
-| Infrastructure PostgreSQL, Wiki, Gitea | Node03 / respective workloads | `storage-infra` |
+| Infrastructure PostgreSQL | Node03 / `horus-db-srv03` | existing `pg-local` volume |
+| Wiki, Gitea | Node03 / respective workloads | `storage-infra` |
 | OCI Registry | Node03 / `horus-reg-srv01` | `artifacts-data` |
 | MinIO | Node04 / `horus-s3-srv01` | `logs-data` |
 
@@ -196,8 +206,18 @@ the ignored `terraform.tfvars`.
 
 Terraform declares `guardian-data`, `mimir-data`, `artifacts-data` and
 `logs-data` only over already-mounted physical roots, with
-`create_base_path = false`. Existing `storage-infra` supplies Golden 9001 and
-Node03 private volumes. Guardian AI does not receive raw PostgreSQL files.
+`create_base_path = false`. PostgreSQL 17 on `horus-db-srv03` (VMID 301,
+`horus-pmx-node03`, `10.10.1.31/24`, VLAN 101) keeps its root on `local-lvm`
+and adopts the existing persistent volume
+`pg-local:301/subvol-301-disk-0.subvol`. It is mounted at
+`/srv/horus/infra/postgres`; `PGDATA` is
+`/srv/horus/infra/postgres/17/main`.
+
+`storage-infra` is the shared NFS datastore used by Golden 9001 and other
+Node03 private volumes. `pg-local` is a Node03-local directory datastore for
+the existing PostgreSQL volume. The Terraform representation reconciles the
+observed storage drift without moving PostgreSQL to NFS or replacing VMID 301.
+Guardian AI does not receive raw PostgreSQL files.
 
 Shared media and build artifacts are separate metadata for later guest-level
 NFS configuration. Bootstrap does not configure application services, mount NFS

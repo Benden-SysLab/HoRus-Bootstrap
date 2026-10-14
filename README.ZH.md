@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 用于重建后的四节点 HoRus Proxmox VE 集群的 Terraform bootstrap。本仓库管理
-29 个工作负载：22 个非特权 LXC 容器和 7 台虚拟机。
+28 个工作负载：22 个非特权 LXC 容器和 6 台虚拟机。
 
 完整参考：[README.md](README.md)。详细架构：[ARCHITECTURE.md](ARCHITECTURE.md)。
 权威拓扑：[`topology.tf`](topology.tf)。
@@ -10,14 +10,15 @@
 
 ## 状态
 
-当前拓扑已成功部署并达到收敛状态。Bootstrap 完成后，
-`terraform plan -parallelism=5` 返回：
+当前 desired state 已部署并达到收敛状态。更新后的
+`terraform plan -parallelism=1` 返回：
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Provider 固定为 `bpg/proxmox 0.115.0`。
+这独立确认了空的 Workspace VM 已退役，Registry 现在使用 VMID 305。本 release
+workflow 未执行 apply。Provider 固定为 `bpg/proxmox 0.115.0`。
 
 ## 架构
 
@@ -30,8 +31,11 @@ local.workloads
   `-- module.lxc_containers   (for_each)
 ```
 
-Terraform 管理基础设施标识和放置。后续 Ansible/服务层管理 guest 内的软件包、
-服务、应用用户、数据权限和 guest-level NFS mount。
+HoRus-Bootstrap/Terraform 管理 Proxmox lifecycle、VM/LXC topology、storage
+attachments 和 infrastructure resources。HoRus-Basis/Ansible 管理 guest OS、
+软件包和服务。Argo CD 仅用于未来的 Kubernetes GitOps，不管理 Proxmox VM/LXC，
+且尚未部署。`horus-work-srv01` 已退役；KasmVNC 和 code-server 不是 active
+service。开发与 CAD 保留在 operator 的个人 laptop 上。
 
 ## 物理集群
 
@@ -67,11 +71,14 @@ Kubernetes：Pod CIDR `private`，Service CIDR `private`。
 |---|---|---|---:|
 | Node01 | 101 `horus-lb-srv01`、102 `horus-agent-srv01`、104 `horus-ai-srv01`、105 `horus-db-srv01`、108 `horus-gg-srv01` | 103 `horus-jnk-srv01`、106 `horus-media-srv01`、107 `horus-k8sw-srv01` | 8 |
 | Node02 | 201 `horus-ans-srv01`、202 `horus-ai-srv02`、203 `horus-db-srv02`、204 `horus-vec-srv01`、205 `horus-cache-srv01`、206 `horus-iam-srv01`、207 `horus-media-srv02` | 208 `horus-k8sw-srv02`、209 `horus-k8sc-srv01` | 9 |
-| Node03 | 301 `horus-db-srv03`、303 `horus-wiki-srv01`、304 `horus-git-srv01`、306 `horus-reg-srv01` | 302 `horus-vlt-srv01`、305 `horus-work-srv01` | 6 |
+| Node03 | 301 `horus-db-srv03`、303 `horus-wiki-srv01`、304 `horus-git-srv01`、305 `horus-reg-srv01` | 302 `horus-vlt-srv01` | 5 |
 | Node04 | 401 `horus-grf-srv01`、402 `horus-pm-srv01`、403 `horus-lok-srv01`、404 `horus-otel-srv01`、405 `horus-s3-srv01`、406 `horus-ai-srv03` | — | 6 |
-| **总计** | **22 LXC** | **7 VM** | **29** |
+| **总计** | **22 LXC** | **6 VM** | **28** |
 
-VMID 307 已保留，Terraform 不会创建它。
+VMID 306-307 已保留，Terraform 不会创建它们。Registry desired state 为
+`horus-reg-srv01`、VMID 305（原 306）、`horus-pmx-node03`、
+`10.10.1.36/24`、VLAN 101、root `local-lvm`、persistent storage
+`artifacts-data`。该 controlled replacement 已由收敛的更新 plan 验证。
 
 Node01 使用 VMID 101-108。`horus-gg-srv01`（VMID 108、LXC、VLAN 150）是隔离的 GitGuardian CLI/ggshield、TruffleHog 和 Trivy scanner。Terraform 创建并放置 LXC、将 rootfs 移至 `local-lvm`、启动并启用 `start_on_boot`；Ansible/service automation 安装并配置 scanners、schedule、credentials 和 CI integration。Node01 为 20 vCPU、26 GiB RAM，并在 130.27 GiB 物理 `local-lvm` 上分配 140 GiB logical roots（thin provisioning ≈1.07x）。
 
@@ -109,9 +116,17 @@ Helper 不执行跨节点迁移、不缩小磁盘，并在状态异常时安全�
 ## 存储和安全
 
 Private data 仅属于对应服务：Guardian 位于 Node01，Mimir 和 AI 位于 Node02，
-infrastructure/Registry 位于 Node03，MinIO logs 位于 Node04。Shared media 和
-artifacts 由后续 Ansible 在 guest 内配置 NFS。Guardian AI 不会获得原始
-PostgreSQL 文件。
+infrastructure/Registry 位于 Node03，MinIO logs 位于 Node04。
+`horus-db-srv03` 上的 PostgreSQL 17（VMID 301、`horus-pmx-node03`、
+`10.10.1.31/24`、VLAN 101）将 root 保留在 `local-lvm`，并使用
+`pg-local:301/subvol-301-disk-0.subvol`。Guest mount 为
+`/srv/horus/infra/postgres`，`PGDATA` 为
+`/srv/horus/infra/postgres/17/main`。
+
+`storage-infra` 是 shared NFS datastore；`pg-local` 是 Node03-local directory
+datastore。Terraform 显式采用现有 volume，不会把 PostgreSQL 迁移到 NFS，也
+不会替换 VMID 301。Shared media 和 artifacts 由后续 Ansible 配置。Guardian AI
+不会获得原始 PostgreSQL 文件。
 
 Golden guest 内已禁用 root SSH。`abbenden-srv` 使用 SSH key 和需要密码的
 sudo，不配置广泛的 `NOPASSWD`。`jenkins-srv` 没有广泛 sudo 权限。所有 LXC

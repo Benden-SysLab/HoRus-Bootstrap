@@ -1,8 +1,8 @@
 # HoRus-Bootstrap
 
 再構築された4ノード構成の HoRus Proxmox VE クラスター向け Terraform
-ブートストラップです。このリポジトリは、21個の非特権 LXC コンテナーと
-7台の仮想マシン、合計29ワークロード（22 LXC）を管理します。
+ブートストラップです。このリポジトリは、22個の非特権 LXC コンテナーと
+6台の仮想マシン、合計28ワークロード（22 LXC）を管理します。
 
 完全なリファレンス: [README.md](README.md)。詳細設計:
 [ARCHITECTURE.md](ARCHITECTURE.md)。正規のトポロジー:
@@ -12,14 +12,16 @@
 
 ## ステータス
 
-現在のトポロジーはデプロイ済みで、収束を確認しています。ブートストラップ
-完了後の `terraform plan -parallelism=5` の結果は次のとおりです。
+現在の desired state はデプロイ済みで収束しています。更新した
+`terraform plan -parallelism=1` の結果は次のとおりです。
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Provider は `bpg/proxmox 0.115.0` に固定されています。
+これにより、空の Workspace VM が廃止され、Registry が VMID 305 を使用して
+いることを独立に確認しました。この release workflow では apply を実行して
+いません。Provider は `bpg/proxmox 0.115.0` に固定されています。
 
 ## アーキテクチャ
 
@@ -32,9 +34,12 @@ local.workloads
   `-- module.lxc_containers   (for_each)
 ```
 
-Terraform はインフラの識別情報と配置を管理します。パッケージ、サービス、
-アプリケーションユーザー、guest 内のデータ所有権、guest-level NFS mount は
-後続の Ansible/サービス層が管理します。
+HoRus-Bootstrap/Terraform は Proxmox lifecycle、VM/LXC topology、storage
+attachments、infrastructure resources を管理します。HoRus-Basis/Ansible は
+guest OS、パッケージ、サービスを管理します。Argo CD は将来の Kubernetes
+GitOps 専用で、Proxmox VM/LXC を管理せず、まだデプロイされていません。
+`horus-work-srv01` は廃止済みで、KasmVNC と code-server は active service
+ではありません。開発と CAD は operator の個人 laptop で行います。
 
 ## 物理クラスター
 
@@ -70,11 +75,15 @@ Kubernetes: Pod CIDR `private`、Service CIDR `private`。
 |---|---|---|---:|
 | Node01 | 101 `horus-lb-srv01`、102 `horus-agent-srv01`、104 `horus-ai-srv01`、105 `horus-db-srv01`、108 `horus-gg-srv01` | 103 `horus-jnk-srv01`、106 `horus-media-srv01`、107 `horus-k8sw-srv01` | 8 |
 | Node02 | 201 `horus-ans-srv01`、202 `horus-ai-srv02`、203 `horus-db-srv02`、204 `horus-vec-srv01`、205 `horus-cache-srv01`、206 `horus-iam-srv01`、207 `horus-media-srv02` | 208 `horus-k8sw-srv02`、209 `horus-k8sc-srv01` | 9 |
-| Node03 | 301 `horus-db-srv03`、303 `horus-wiki-srv01`、304 `horus-git-srv01`、306 `horus-reg-srv01` | 302 `horus-vlt-srv01`、305 `horus-work-srv01` | 6 |
+| Node03 | 301 `horus-db-srv03`、303 `horus-wiki-srv01`、304 `horus-git-srv01`、305 `horus-reg-srv01` | 302 `horus-vlt-srv01` | 5 |
 | Node04 | 401 `horus-grf-srv01`、402 `horus-pm-srv01`、403 `horus-lok-srv01`、404 `horus-otel-srv01`、405 `horus-s3-srv01`、406 `horus-ai-srv03` | — | 6 |
-| **合計** | **22 LXC** | **7 VM** | **29** |
+| **合計** | **22 LXC** | **6 VM** | **28** |
 
-VMID 307 は予約済みで、Terraform は作成しません。
+VMID 306-307 は予約済みで、Terraform は作成しません。Registry の desired
+state は `horus-reg-srv01`、VMID 305（旧 306）、`horus-pmx-node03`、
+`10.10.1.36/24`、VLAN 101、root `local-lvm`、persistent storage
+`artifacts-data` です。Controlled replacement は収束した更新 plan で確認済み
+です。
 
 Node01 の VMID 範囲は 101-108 です。`horus-gg-srv01`（VMID 108、LXC、VLAN 150）は GitGuardian CLI/ggshield、TruffleHog、Trivy 用の分離 scanner です。Terraform は LXC の作成と配置、rootfs の `local-lvm` への移動、起動、`start_on_boot` を管理し、Ansible/service automation は scanner、schedule、credentials、CI integration を構成します。Node01 は 20 vCPU、26 GiB RAM、130.27 GiB の物理 `local-lvm` に 140 GiB の logical roots（約 1.07x thin provisioning）です。
 
@@ -113,9 +122,17 @@ Helper はノード間 migration を行わず、ディスクを縮小せず、�
 ## ストレージとセキュリティ
 
 Private data は単一サービスに帰属します。Guardian は Node01、Mimir と AI は
-Node02、infrastructure/Registry は Node03、MinIO logs は Node04 です。Shared
-media と artifacts の guest-level NFS は後続の Ansible が設定します。
-Guardian AI に PostgreSQL の raw files は渡しません。
+Node02、infrastructure/Registry は Node03、MinIO logs は Node04 です。
+`horus-db-srv03` の PostgreSQL 17（VMID 301、`horus-pmx-node03`、
+`10.10.1.31/24`、VLAN 101）は root を `local-lvm` に保持し、
+`pg-local:301/subvol-301-disk-0.subvol` を使用します。Guest mount は
+`/srv/horus/infra/postgres`、`PGDATA` は
+`/srv/horus/infra/postgres/17/main` です。
+
+`storage-infra` は shared NFS datastore、`pg-local` は Node03-local directory
+datastore です。Terraform は既存 volume を表現し、PostgreSQL を NFS へ移動
+せず VMID 301 も置換しません。Shared media と artifacts は後続の Ansible が
+設定します。Guardian AI に PostgreSQL の raw files は渡しません。
 
 Golden guest では root SSH を無効化しています。`abbenden-srv` は SSH key と
 パスワード付き sudo を使用し、包括的な `NOPASSWD` はありません。

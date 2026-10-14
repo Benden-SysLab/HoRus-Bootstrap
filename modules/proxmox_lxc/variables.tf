@@ -48,6 +48,19 @@ variable "private_mounts" {
   }
 }
 
+variable "private_mount_volumes" {
+  type        = list(string)
+  default     = []
+  description = "Provider-owned allocation datastore or fully qualified existing volume for each private mount"
+  validation {
+    condition = (
+      length(var.private_mount_volumes) == length(var.private_mounts) &&
+      alltrue([for volume in var.private_mount_volumes : can(regex("^[A-Za-z0-9_.-]+(?::[A-Za-z0-9_./-]+)?$", volume))])
+    )
+    error_message = "Each private mount must have one safe datastore or fully qualified existing volume ID."
+  }
+}
+
 variable "bootstrap_ssh_key_path" {
   type        = string
   description = "OpenSSH private-key file path for root access to Proxmox nodes"

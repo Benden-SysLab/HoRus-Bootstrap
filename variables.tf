@@ -54,7 +54,7 @@ variable "environment" {
       length(setsubtract(toset([
         "horus-lb-srv01", "horus-agent-srv01", "horus-jnk-srv01", "horus-ai-srv01", "horus-db-srv01", "horus-media-srv01", "horus-k8sw-srv01", "horus-gg-srv01",
         "horus-ans-srv01", "horus-ai-srv02", "horus-db-srv02", "horus-vec-srv01", "horus-cache-srv01", "horus-iam-srv01", "horus-media-srv02", "horus-k8sw-srv02", "horus-k8sc-srv01",
-        "horus-db-srv03", "horus-vlt-srv01", "horus-wiki-srv01", "horus-git-srv01", "horus-work-srv01", "horus-reg-srv01",
+        "horus-db-srv03", "horus-vlt-srv01", "horus-wiki-srv01", "horus-git-srv01", "horus-reg-srv01",
         "horus-grf-srv01", "horus-pm-srv01", "horus-lok-srv01", "horus-otel-srv01", "horus-s3-srv01", "horus-ai-srv03"
       ]), toset(keys(var.environment.workload_ips)))) == 0,
       length(setsubtract(toset(["guardian-data", "mimir-data", "infra", "artifacts", "logs", "media"]), toset(keys(var.environment.storage_paths)))) == 0,

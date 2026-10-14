@@ -1,8 +1,8 @@
 # HoRus-Bootstrap
 
 Terraform-Bootstrap für den neu aufgebauten HoRus-Proxmox-VE-Cluster mit vier
-Knoten. Das Repository verwaltet 29 Workloads: 22 unprivilegierte
-LXC-Container und 7 virtuelle Maschinen.
+Knoten. Das Repository verwaltet 28 Workloads: 22 unprivilegierte
+LXC-Container und 6 virtuelle Maschinen.
 
 Vollständige Referenz: [README.md](README.md). Architekturdetails:
 [ARCHITECTURE.md](ARCHITECTURE.md). Maßgebliche Topologie:
@@ -12,13 +12,15 @@ Umgebungsspezifische Management-/Workload-Adressen, VLAN-CIDRs und Gateways, NFS
 
 ## Status
 
-Die aktuelle Topologie wurde erfolgreich ausgerollt und ist konvergiert. Der
-abschließende Befehl `terraform plan -parallelism=5` meldete:
+Der aktuelle Desired State ist ausgerollt und konvergiert. Ein aktualisierter
+`terraform plan -parallelism=1` meldete:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
+Damit ist unabhängig bestätigt, dass die leere Workspace-VM entfernt ist und
+Registry jetzt VMID 305 nutzt. Dieser Release-Workflow führte kein Apply aus.
 Verwendeter Provider: `bpg/proxmox 0.115.0`.
 
 ## Architektur
@@ -32,9 +34,13 @@ local.workloads
   `-- module.lxc_containers   (for_each)
 ```
 
-Terraform verwaltet Identität und Infrastrukturplatzierung. Ansible bzw. die
-spätere Service-Schicht verwaltet Pakete, Dienste, Benutzer, Datenrechte im Gast
-und NFS-Mounts innerhalb der Gäste.
+HoRus-Bootstrap/Terraform verwaltet Proxmox-Lifecycle, VM/LXC-Topologie,
+Storage-Attachments und Infrastrukturressourcen. HoRus-Basis/Ansible verwaltet
+Guest-OS, Pakete und Dienste. Argo CD ist nur für künftiges Kubernetes GitOps
+vorgesehen, verwaltet keine Proxmox-VM/LXC und ist noch nicht ausgerollt.
+`horus-work-srv01` ist stillgelegt; KasmVNC und code-server sind keine aktiven
+HoRus-Dienste. Entwicklung und CAD bleiben auf dem persönlichen Laptop des
+Operators.
 
 ## Physischer Cluster
 
@@ -70,11 +76,15 @@ Kubernetes: Pod CIDR `private`, Service CIDR `private`.
 |---|---|---|---:|
 | Node01 | 101 `horus-lb-srv01`, 102 `horus-agent-srv01`, 104 `horus-ai-srv01`, 105 `horus-db-srv01`, 108 `horus-gg-srv01` | 103 `horus-jnk-srv01`, 106 `horus-media-srv01`, 107 `horus-k8sw-srv01` | 8 |
 | Node02 | 201 `horus-ans-srv01`, 202 `horus-ai-srv02`, 203 `horus-db-srv02`, 204 `horus-vec-srv01`, 205 `horus-cache-srv01`, 206 `horus-iam-srv01`, 207 `horus-media-srv02` | 208 `horus-k8sw-srv02`, 209 `horus-k8sc-srv01` | 9 |
-| Node03 | 301 `horus-db-srv03`, 303 `horus-wiki-srv01`, 304 `horus-git-srv01`, 306 `horus-reg-srv01` | 302 `horus-vlt-srv01`, 305 `horus-work-srv01` | 6 |
+| Node03 | 301 `horus-db-srv03`, 303 `horus-wiki-srv01`, 304 `horus-git-srv01`, 305 `horus-reg-srv01` | 302 `horus-vlt-srv01` | 5 |
 | Node04 | 401 `horus-grf-srv01`, 402 `horus-pm-srv01`, 403 `horus-lok-srv01`, 404 `horus-otel-srv01`, 405 `horus-s3-srv01`, 406 `horus-ai-srv03` | — | 6 |
-| **Gesamt** | **22 LXC** | **7 VM** | **29** |
+| **Gesamt** | **22 LXC** | **6 VM** | **28** |
 
-VMID 307 ist reserviert und wird nicht erstellt.
+VMIDs 306-307 sind reserviert und werden nicht erstellt. Registry ist als
+`horus-reg-srv01`, VMID 305 (zuvor 306), auf `horus-pmx-node03` mit
+`10.10.1.36/24`, VLAN 101, `local-lvm`-Root und persistentem
+`artifacts-data`-Storage definiert. Die kontrollierte Ersetzung ist durch den
+konvergierten aktualisierten Plan bestätigt.
 
 Node01 nutzt VMIDs 101-108. `horus-gg-srv01` (VMID 108, LXC, VLAN 150) ist der isolierte GitGuardian CLI/ggshield-, TruffleHog- und Trivy-Scanner. Terraform erstellt und platziert den LXC, verschiebt das rootfs nach `local-lvm`, startet ihn und setzt `start_on_boot`; Ansible/service automation installiert und konfiguriert Scanner, Zeitpläne, Credentials und CI-Integration. Node01: 20 vCPU, 26 GiB RAM, 140 GiB logische Roots auf 130.27 GiB physischem `local-lvm` (ca. 1.07x Thin-Provisioning).
 
@@ -116,8 +126,17 @@ Provider-Grenze: `started`, `disk[0].datastore_id` und `disk[0].size`.
 
 Private Zustände bleiben beim jeweiligen Dienst: Guardian auf Node01, Mimir und
 AI-Daten auf Node02, Infrastruktur/Registry auf Node03 und MinIO-Logs auf
-Node04. Shared Media und Build-Artefakte werden erst später als guest-level NFS
-durch Ansible konfiguriert. Guardian AI erhält keine rohen PostgreSQL-Dateien.
+Node04. PostgreSQL 17 auf `horus-db-srv03` (VMID 301,
+`horus-pmx-node03`, `10.10.1.31/24`, VLAN 101) behält sein Root auf
+`local-lvm` und nutzt `pg-local:301/subvol-301-disk-0.subvol`. Guest-Mount ist
+`/srv/horus/infra/postgres`, `PGDATA` ist
+`/srv/horus/infra/postgres/17/main`.
+
+`storage-infra` ist das Shared-NFS-Datastore; `pg-local` ist ein lokales
+Directory-Datastore auf Node03. Terraform bildet das vorhandene Volume ab,
+ohne PostgreSQL nach NFS zu verschieben oder VMID 301 zu ersetzen. Shared Media
+und Build-Artefakte werden später durch Ansible konfiguriert. Guardian AI erhält
+keine rohen PostgreSQL-Dateien.
 
 Root-SSH ist in den Golden-Gästen deaktiviert. `abbenden-srv` verwendet einen
 SSH-Key und passwortgeschütztes sudo ohne pauschales `NOPASSWD`.

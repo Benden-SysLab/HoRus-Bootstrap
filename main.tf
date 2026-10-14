@@ -47,6 +47,9 @@ module "lxc_containers" {
     path         = mount.path
     size         = mount.size
   }]
+  private_mount_volumes = [for mount in try(each.value.private_mounts, []) :
+    try(mount.volume, local.storage_inventory[mount.storage_name].datastore_id)
+  ]
   bootstrap_ssh_key_path = var.bootstrap_ssh_key_path
   allow_lxc_shutdown     = var.allow_lxc_shutdown
 

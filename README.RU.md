@@ -1,8 +1,8 @@
 # HoRus-Bootstrap
 
 Terraform-bootstrap обновлённого четырёхнодового кластера HoRus Proxmox VE.
-Репозиторий управляет 29 workloads: 22 непривилегированными LXC-контейнерами и
-7 виртуальными машинами, включая их размещение, вычислительные ресурсы, сеть и
+Репозиторий управляет 28 workloads: 22 непривилегированными LXC-контейнерами и
+6 виртуальными машинами, включая их размещение, вычислительные ресурсы, сеть и
 подключение приватных хранилищ.
 
 English documentation: [README.md](README.md). Подробная архитектура:
@@ -10,16 +10,17 @@ English documentation: [README.md](README.md). Подробная архитек
 
 ## Статус
 
-Текущая топология развёрнута и приведена к сходящемуся состоянию. После
-завершённого bootstrap команда `terraform plan -parallelism=5` вернула:
+Текущее desired state развёрнуто и приведено к сходящемуся состоянию. Refreshed
+`terraform plan -parallelism=1` вернул:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Это подтверждает согласованность Terraform state, ресурсов provider, LXC
-placement helper и фактической конфигурации Proxmox. Используется фиксированная
-версия `bpg/proxmox 0.115.0`.
+Это независимо подтверждает, что пустая Workspace VM выведена из эксплуатации,
+а Registry теперь использует VMID 305. В рамках этого release workflow
+инфраструктура не применялась. Используется фиксированная версия
+`bpg/proxmox 0.115.0`.
 
 ## Обзор архитектуры
 
@@ -32,9 +33,15 @@ local.workloads
   `-- module.lxc_containers   (for_each)
 ```
 
-Terraform отвечает за идентичность и инфраструктурное размещение. Будущий слой
-Ansible/сервисной конфигурации отвечает за пакеты, сервисы, пользователей
-приложений, ownership данных внутри guests и guest-level mounts общих данных.
+HoRus-Bootstrap и Terraform отвечают за lifecycle инфраструктуры Proxmox,
+топологию VM/LXC, storage attachments и infrastructure resources. HoRus-Basis
+и Ansible отвечают за конфигурацию guest OS, пакеты и сервисы. Argo CD
+предназначен только для будущего Kubernetes GitOps: он не управляет Proxmox
+VM/LXC и не считается развёрнутым.
+
+Выделенная Workspace `horus-work-srv01` выведена из desired architecture.
+KasmVNC и code-server не являются активными сервисами HoRus; разработка и CAD
+выполняются на личном ноутбуке оператора.
 
 ## Физический кластер
 
@@ -96,8 +103,7 @@ Kubernetes Pod и Service CIDR относятся к environment-specific сет
 | Node03 | 302 | VM | `horus-vlt-srv01` | private | 101 |
 | Node03 | 303 | LXC | `horus-wiki-srv01` | private | 101 |
 | Node03 | 304 | LXC | `horus-git-srv01` | private | 101 |
-| Node03 | 305 | VM | `horus-work-srv01` | private | 101 |
-| Node03 | 306 | LXC | `horus-reg-srv01` | private | 101 |
+| Node03 | 305 | LXC | `horus-reg-srv01` | private | 101 |
 | Node04 | 401 | LXC | `horus-grf-srv01` | private | 150 |
 | Node04 | 402 | LXC | `horus-pm-srv01` | private | 150 |
 | Node04 | 403 | LXC | `horus-lok-srv01` | private | 150 |
@@ -105,8 +111,12 @@ Kubernetes Pod и Service CIDR относятся к environment-specific сет
 | Node04 | 405 | LXC | `horus-s3-srv01` | private | 150 |
 | Node04 | 406 | LXC | `horus-ai-srv03` | private | 150 |
 
-Количество по нодам: 8 / 9 / 6 / 6. Node01 использует VMID 101-108. VMID 307 зарезервирован и Terraform его
-не создаёт.
+Количество по нодам: 8 / 9 / 5 / 6. Node01 использует VMID 101-108. VMID
+306-307 зарезервированы, Terraform их не создаёт. Registry задан как
+`horus-reg-srv01`, VMID 305 (ранее 306), на `horus-pmx-node03`, адрес
+`10.10.1.36/24`, VLAN 101, root на `local-lvm`, persistent storage
+`artifacts-data`. Controlled replacement выполнен ранее и теперь подтверждён
+сходящимся refreshed plan.
 
 `horus-gg-srv01` — изолированный security scanner для GitGuardian CLI/ggshield,
 TruffleHog и Trivy. Terraform создаёт LXC, задаёт VMID, CPU, RAM, сеть и
@@ -189,7 +199,8 @@ data.
 |---|---|---|
 | Guardian PostgreSQL | Node01 / `horus-db-srv01` | `guardian-data` |
 | Mimir, AI PostgreSQL, Qdrant | Node02 / соответствующие workloads | `mimir-data` |
-| Infrastructure PostgreSQL, Wiki, Gitea | Node03 / соответствующие workloads | `storage-infra` |
+| Infrastructure PostgreSQL | Node03 / `horus-db-srv03` | существующий volume `pg-local` |
+| Wiki, Gitea | Node03 / соответствующие workloads | `storage-infra` |
 | OCI Registry | Node03 / `horus-reg-srv01` | `artifacts-data` |
 | MinIO | Node04 / `horus-s3-srv01` | `logs-data` |
 
@@ -198,8 +209,18 @@ ignored `terraform.tfvars`.
 
 Terraform объявляет `guardian-data`, `mimir-data`, `artifacts-data` и
 `logs-data` только поверх уже смонтированных физических roots и использует
-`create_base_path = false`. Существующий `storage-infra` обслуживает Golden
-9001 и private volumes Node03. Guardian AI не получает raw PostgreSQL files.
+`create_base_path = false`. PostgreSQL 17 на `horus-db-srv03` (VMID 301,
+`horus-pmx-node03`, `10.10.1.31/24`, VLAN 101) сохраняет root на `local-lvm` и
+использует существующий persistent volume
+`pg-local:301/subvol-301-disk-0.subvol`. Он смонтирован в
+`/srv/horus/infra/postgres`, а `PGDATA` —
+`/srv/horus/infra/postgres/17/main`.
+
+`storage-infra` — shared NFS datastore для Golden 9001 и других private
+volumes Node03. `pg-local` — локальный directory datastore Node03 для
+существующего PostgreSQL volume. Явное Terraform-представление устраняет
+storage drift без миграции PostgreSQL на NFS и без замены VMID 301. Guardian AI
+не получает raw PostgreSQL files.
 
 Shared media и build artifacts описаны отдельно как metadata для будущей
 guest-level NFS configuration. Bootstrap не настраивает приложения, не

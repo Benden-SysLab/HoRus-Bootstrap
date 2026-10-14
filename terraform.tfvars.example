@@ -49,7 +49,6 @@ environment = {
     horus-vlt-srv01 = "198.51.100.9/28"
     horus-wiki-srv01 = "198.51.100.10/28"
     horus-git-srv01 = "198.51.100.11/28"
-    horus-work-srv01 = "198.51.100.12/28"
     horus-reg-srv01 = "198.51.100.13/28"
     horus-grf-srv01 = "198.51.100.84/28"
     horus-pm-srv01 = "198.51.100.85/28"

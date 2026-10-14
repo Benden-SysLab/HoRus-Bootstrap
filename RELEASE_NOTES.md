@@ -1,5 +1,68 @@
 # HoRus-Bootstrap release notes
 
+## v2.1.0
+
+Release: `v2.1.0`.
+
+### Highlights
+
+- Updated the desired topology to 28 workloads: 22 unprivileged LXC containers
+  and 6 QEMU virtual machines across four Proxmox nodes.
+- Retired the empty dedicated Workspace VM. KasmVNC and code-server are not
+  active HoRus services; development and CAD remain on the operator laptop.
+- Completed and verified the controlled Registry VMID reassignment.
+- Reconciled the existing PostgreSQL persistent-volume representation.
+- Synchronized all nine README language variants.
+
+### Infrastructure changes
+
+- Removed `horus-work-srv01` from desired state, releasing VMID 305.
+- Reassigned `horus-reg-srv01` from VMID 306 to VMID 305 while preserving its
+  hostname, Node03 placement, `10.10.1.36/24` address, VLAN 101, `local-lvm`
+  root and `artifacts-data` persistence policy.
+- Preserved the authoritative dynamic `for_each` inventory and the existing
+  VM/LXC lifecycle architecture.
+
+### Storage
+
+- PostgreSQL 17 on `horus-db-srv03` (VMID 301) now adopts its existing volume
+  `pg-local:301/subvol-301-disk-0.subvol` by full ID. The guest mount remains
+  `/srv/horus/infra/postgres` and `PGDATA` remains
+  `/srv/horus/infra/postgres/17/main`.
+- `pg-local` remains a Node03-local directory datastore. `storage-infra`
+  remains the shared NFS datastore for Golden 9001 and the approved Node03
+  shared-storage consumers. PostgreSQL is not migrated to NFS.
+
+### Compatibility and operational notes
+
+- The Registry VMID change was a real controlled LXC replacement. The empty
+  VMID 305 Workspace was removed before Registry was recreated as 305.
+- PostgreSQL VMID 301 is an adopted existing object and is not scheduled for
+  replacement.
+- HoRus-Bootstrap/Terraform owns Proxmox infrastructure. HoRus-Basis/Ansible
+  owns guest configuration. Argo CD remains a future Kubernetes GitOps layer
+  and does not manage Proxmox VM/LXC resources.
+
+### Validation
+
+- `terraform fmt -check -recursive`: passed.
+- `terraform validate`: passed.
+- `terraform test`: 5 passed, 0 failed.
+- Offline LXC placement tests: 7 passed.
+- Refreshed plan: `No changes. Your infrastructure matches the configuration.`
+  Existing VM/LXC destroy/replace: 0/0. PostgreSQL VMID 301 and Golden
+  templates 9000/9001 have no actions.
+
+### Deployment status
+
+Repository desired state and the refreshed Proxmox plan are converged. No
+`terraform apply`, state mutation or Proxmox change was performed while
+preparing this release; the already-completed Registry migration was only
+verified.
+
+Documentation: [README.md](README.md), [ARCHITECTURE.md](ARCHITECTURE.md),
+[RESOURCE_PLAN.md](RESOURCE_PLAN.md).
+
 ## v2.0.2
 
 Release: `v2.0.2`.

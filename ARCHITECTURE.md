@@ -4,24 +4,32 @@ Environment-specific management/workload addresses, VLAN CIDRs and gateways, NFS
 
 ## Design authority
 
-The current working-tree Terraform and the verified deployment are the source
-of truth. [`topology.tf`](topology.tf) declares nodes, VLANs, gateways, Golden
+The current working-tree Terraform is the desired-state source of truth. A
+refreshed plan verified that the deployed cluster currently converges with it.
+[`topology.tf`](topology.tf) declares nodes, VLANs, gateways, Golden
 metadata, workloads and storage consumers exactly once. `main.tf` derives
 `for_each` VM and LXC module instances; scripts do not contain a second workload
 inventory.
 
-The target cluster contains 29 managed workloads: 22 LXC and 7 VM.
+The target cluster contains 28 managed workloads: 22 LXC and 6 VM.
 
 | Final node | VMID range | LXC | VM | Total |
 |---|---:|---:|---:|---:|
 | `horus-pmx-node01` | 101-108 | 5 | 3 | 8 |
 | `horus-pmx-node02` | 201-209 | 7 | 2 | 9 |
-| `horus-pmx-node03` | 301-306 | 4 | 2 | 6 |
+| `horus-pmx-node03` | 301-305 | 4 | 1 | 5 |
 | `horus-pmx-node04` | 401-406 | 6 | 0 | 6 |
-| **Total** |  | **22** | **7** | **29** |
+| **Total** |  | **22** | **6** | **28** |
 
-VMID 307 is reserved. Golden VMIDs 9000 and 9001 are external prerequisites
+VMIDs 306-307 are reserved. Golden VMIDs 9000 and 9001 are external prerequisites
 and remain outside Terraform state.
+
+The empty `horus-work-srv01` Workspace is retired. KasmVNC and code-server are
+not active HoRus services; development and CAD remain on the operator laptop.
+Registry is desired as `horus-reg-srv01`, VMID 305 (previously 306), on Node03
+with `10.10.1.36/24`, VLAN 101, a `local-lvm` root and `artifacts-data`
+persistence. The reassignment required a controlled replacement and is now
+verified converged; this release workflow did not perform the apply.
 
 VMID 108 is `horus-gg-srv01`, an LXC on Node01 and VLAN 150 for isolated
 GitGuardian CLI/ggshield, TruffleHog and Trivy scanning. Terraform owns its
@@ -44,10 +52,11 @@ Terraform/provider owns:
 Terraform also declares the approved Proxmox directory storage resources over
 already-mounted physical roots. It does not create those filesystems.
 
-Ansible and service automation own guest packages, services, application
-accounts, application-level permissions, data ownership inside guests and
-guest-level NFS mounts. Bootstrap intentionally stops at the infrastructure
-boundary.
+HoRus-Basis and Ansible own guest packages, services, application accounts,
+application-level permissions, data ownership inside guests and guest-level
+NFS mounts. Bootstrap intentionally stops at the infrastructure boundary.
+Argo CD is reserved for future Kubernetes GitOps only; it neither manages
+Proxmox VM/LXC resources nor represents a deployed component here.
 
 ## VM provisioning
 
@@ -175,13 +184,21 @@ Proxmox-managed storage-backed LXC mount points on the physical owner node.
 |---|---|---|---|
 | `guardian-data` | Node01 | `/private/environment/path` | Guardian PostgreSQL |
 | `mimir-data` | Node02 | `/private/environment/path` | Mimir, AI PostgreSQL, Qdrant |
-| `storage-infra` | Node03 | `/private/environment/path` | infrastructure PostgreSQL, Wiki, Gitea; also Golden 9001 clone storage |
+| `pg-local` | Node03 | existing Proxmox volume | infrastructure PostgreSQL VMID 301 |
+| `storage-infra` | Node03 | `/private/environment/path` | Wiki, Gitea; also Golden 9001 clone storage |
 | `artifacts-data` | Node03 | `/private/environment/path` | OCI Registry |
 | `logs-data` | Node04 | `/private/environment/path` | MinIO |
 
 Terraform sets `create_base_path = false` for managed directory storages, so a
 missing physical mount is not silently replaced by an ordinary directory.
-`storage-infra` already exists and is reused rather than recreated.
+PostgreSQL 17 on `horus-db-srv03` (VMID 301, Node03, `10.10.1.31/24`, VLAN 101)
+keeps its root on `local-lvm`. Its persistent guest mount
+`/srv/horus/infra/postgres` adopts the existing volume
+`pg-local:301/subvol-301-disk-0.subvol`; `PGDATA` is
+`/srv/horus/infra/postgres/17/main`. Terraform references the complete volume
+ID and does not allocate, migrate or replace it. `storage-infra` is shared NFS;
+`pg-local` is a Node03-local directory datastore. PostgreSQL is not moved back
+to NFS.
 
 Shared media and build artifacts are a separate category. Terraform emits
 their consumer metadata, while Ansible/service automation later configures NFS
@@ -218,7 +235,7 @@ state.
 ## Safety invariants
 
 - Golden 9000 and 9001 are never Terraform-managed.
-- VMID 307 remains reserved.
+- VMIDs 306-307 remain reserved.
 - Unexpected identity, node, storage, lock or network state fails closed.
 - Disk shrinking and automatic guest unlock are forbidden.
 - Physical storage roots must be mounted and verified before apply.
