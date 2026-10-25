@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Terraform-bootstrap обновлённого четырёхнодового кластера HoRus Proxmox VE.
-Репозиторий управляет 28 workloads: 22 непривилегированными LXC-контейнерами и
+Репозиторий управляет 29 workloads: 23 непривилегированными LXC-контейнерами и
 6 виртуальными машинами, включая их размещение, вычислительные ресурсы, сеть и
 подключение приватных хранилищ.
 
@@ -11,15 +11,15 @@ English documentation: [README.md](README.md). Подробная архитек
 ## Статус
 
 Текущее desired state развёрнуто и приведено к сходящемуся состоянию. После
-восстановления storage DB03 `terraform plan -parallelism=5` вернул:
+создания LXC Vikunja `terraform plan -parallelism=5` вернул:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Controlled apply заменил только пустой LXC DB03 и его placement helper; VM 302
-и все остальные workloads не изменялись. Используется фиксированная версия
-`bpg/proxmox 0.115.0`.
+Apply v2.2.0 создал только CT 306 и его placement helper (`2 added, 0 changed,
+0 destroyed`). Все существующие workloads и Golden 9000/9001 остались без
+изменений. Используется фиксированная версия `bpg/proxmox 0.115.0`.
 
 ## Обзор архитектуры
 
@@ -103,6 +103,7 @@ Kubernetes Pod и Service CIDR относятся к environment-specific сет
 | Node03 | 303 | LXC | `horus-wiki-srv01` | private | 101 |
 | Node03 | 304 | LXC | `horus-git-srv01` | private | 101 |
 | Node03 | 305 | LXC | `horus-reg-srv01` | private | 101 |
+| Node03 | 306 | LXC | `horus-vkj-srv01` | private | 101 |
 | Node04 | 401 | LXC | `horus-grf-srv01` | private | 150 |
 | Node04 | 402 | LXC | `horus-pm-srv01` | private | 150 |
 | Node04 | 403 | LXC | `horus-lok-srv01` | private | 150 |
@@ -110,12 +111,17 @@ Kubernetes Pod и Service CIDR относятся к environment-specific сет
 | Node04 | 405 | LXC | `horus-s3-srv01` | private | 150 |
 | Node04 | 406 | LXC | `horus-ai-srv03` | private | 150 |
 
-Количество по нодам: 8 / 9 / 5 / 6. Node01 использует VMID 101-108. VMID
-306-307 зарезервированы, Terraform их не создаёт. Registry задан как
+Количество по нодам: 8 / 9 / 6 / 6. Node01 использует VMID 101-108. VMID 307
+зарезервирован, Terraform его не создаёт. Registry задан как
 `horus-reg-srv01`, VMID 305 (ранее 306), на `horus-pmx-node03`, адрес
 `10.10.1.36/24`, VLAN 101, root на `local-lvm`, persistent storage
 `artifacts-data`. Controlled replacement выполнен ранее и теперь подтверждён
 сходящимся refreshed plan.
+
+`horus-vkj-srv01` — отдельный LXC приложения Vikunja на Node03/VLAN 101.
+Terraform владеет VMID 306, compute, сетью, placement, boot policy и приватным
+подключением `infra-data`. HoRus-Basis/Ansible отвечает за Vikunja, настройку
+его БД и lifecycle приложения; PostgreSQL предоставляется DB03.
 
 `horus-gg-srv01` — изолированный security scanner для GitGuardian CLI/ggshield,
 TruffleHog и Trivy. Terraform создаёт LXC, задаёт VMID, CPU, RAM, сеть и
@@ -200,7 +206,7 @@ data.
 | Mimir, AI PostgreSQL, Qdrant | Node02 / соответствующие workloads | `mimir-data` |
 | Infrastructure PostgreSQL | Node03 / `horus-db-srv03` | provider-allocated volume `pg-local` |
 | Weekly backups PostgreSQL | Node03 / `horus-db-srv03` | provider-allocated volume 8 GiB на `storage-infra` |
-| Wiki, Gitea | Node03 / соответствующие workloads | `storage-infra` |
+| Wiki, Gitea, Vikunja | Node03 / соответствующие workloads | `storage-infra` |
 | OCI Registry | Node03 / `horus-reg-srv01` | `artifacts-data` |
 | MinIO | Node04 / `horus-s3-srv01` | `logs-data` |
 

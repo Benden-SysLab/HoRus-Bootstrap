@@ -50,6 +50,7 @@ variables {
       horus-wiki-srv01  = "198.51.100.10/28"
       horus-git-srv01   = "198.51.100.11/28"
       horus-reg-srv01   = "198.51.100.13/28"
+      horus-vkj-srv01   = "198.51.100.14/28"
       horus-grf-srv01   = "198.51.100.84/28"
       horus-pm-srv01    = "198.51.100.85/28"
       horus-lok-srv01   = "198.51.100.86/28"
@@ -79,6 +80,7 @@ variables {
       infra-backups      = "/data/example/infra/backups"
       infra-wiki         = "/data/example/infra/wiki"
       infra-gitea        = "/data/example/infra/gitea"
+      infra-vikunja      = "/data/example/infra/vikunja"
       artifacts-registry = "/data/example/artifacts/registry"
       logs               = "/data/example/logs"
       example-extra      = "/data/example/extra"
@@ -95,8 +97,8 @@ run "authoritative_inventory_and_boundaries" {
   command = plan
 
   assert {
-    condition     = length(local.workloads) == 28 && length(local.lxc_workloads) == 22 && length(local.vm_workloads) == 6
-    error_message = "Expected 28 workloads: 22 LXC and 6 VM."
+    condition     = length(local.workloads) == 29 && length(local.lxc_workloads) == 23 && length(local.vm_workloads) == 6
+    error_message = "Expected 29 workloads: 23 LXC and 6 VM."
   }
   assert {
     condition = {
@@ -104,7 +106,7 @@ run "authoritative_inventory_and_boundaries" {
       } == {
       "horus-pmx-node01" = 8
       "horus-pmx-node02" = 9
-      "horus-pmx-node03" = 5
+      "horus-pmx-node03" = 6
       "horus-pmx-node04" = 6
     }
     error_message = "Per-node workload counts changed."
@@ -152,17 +154,17 @@ run "authoritative_inventory_and_boundaries" {
       !contains(keys(local.workloads), "horus-ai-srv04") &&
       !contains(keys(local.workloads), "horus-work-srv01") &&
       local.workloads["horus-reg-srv01"].vmid == 305 &&
-      !contains([for workload in values(local.workloads) : workload.vmid], 306) &&
+      local.workloads["horus-vkj-srv01"].vmid == 306 &&
       !contains([for workload in values(local.workloads) : workload.vmid], 307)
     )
     error_message = "Retired workloads returned or OCI Registry did not take approved VMID 305."
   }
   assert {
-    condition     = local.local_lvm_logical_root_gib["horus-pmx-node01"] == 140 && local.local_lvm_logical_root_gib["horus-pmx-node02"] == 136 && local.local_lvm_logical_root_gib["horus-pmx-node03"] == 84 && local.local_lvm_logical_root_gib["horus-pmx-node04"] == 78
+    condition     = local.local_lvm_logical_root_gib["horus-pmx-node01"] == 140 && local.local_lvm_logical_root_gib["horus-pmx-node02"] == 136 && local.local_lvm_logical_root_gib["horus-pmx-node03"] == 96 && local.local_lvm_logical_root_gib["horus-pmx-node04"] == 78
     error_message = "Capacity arithmetic changed."
   }
   assert {
-    condition     = length(local.nodes) == 4 && length(local.vlans) == 9 && length(local.workloads) == 28
+    condition     = length(local.nodes) == 4 && length(local.vlans) == 9 && length(local.workloads) == 29
     error_message = "Extra environment mappings must not create topology objects."
   }
   assert {
@@ -187,5 +189,18 @@ run "authoritative_inventory_and_boundaries" {
       for node in keys(local.nodes) : node => sum([for workload in values(local.workloads) : workload.cores if workload.target_node == node])
     }["horus-pmx-node01"] == 20 && local.node_ram_allocated_mb["horus-pmx-node01"] == 26624
     error_message = "Node01 CPU or RAM capacity arithmetic changed."
+  }
+  assert {
+    condition = (
+      local.workloads["horus-vkj-srv01"].type == "lxc" &&
+      local.workloads["horus-vkj-srv01"].target_node == "horus-pmx-node03" &&
+      local.workloads["horus-vkj-srv01"].vlan_id == 101 &&
+      local.workloads["horus-vkj-srv01"].cores == 1 &&
+      local.workloads["horus-vkj-srv01"].memory == 1024 &&
+      local.workloads["horus-vkj-srv01"].disk_size == "12" &&
+      local.workloads["horus-vkj-srv01"].private_mounts[0].storage_name == "infra-data" &&
+      local.workloads["horus-vkj-srv01"].private_mounts[0].path == "/data/example/infra/vikunja"
+    )
+    error_message = "Vikunja workload contract changed."
   }
 }

@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Terraform bootstrap for the rebuilt four-node HoRus Proxmox VE cluster. The
-repository manages 28 workloads—22 unprivileged LXC containers and 6 virtual
+repository manages 29 workloads—23 unprivileged LXC containers and 6 virtual
 machines—together with their placement, compute, network and private storage
 attachments.
 
@@ -10,16 +10,16 @@ Russian documentation: [README.RU.md](README.RU.md). Detailed design:
 
 ## Status
 
-The current desired topology is deployed and converged. After the DB03 storage
-recovery, `terraform plan -parallelism=5` returned:
+The current desired topology is deployed and converged. After creating the
+Vikunja LXC, `terraform plan -parallelism=5` returned:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-The controlled apply replaced only the empty DB03 LXC and its placement helper;
-VM 302 and all unrelated workloads were unchanged. The provider is pinned to
-`bpg/proxmox 0.115.0`.
+The v2.2.0 apply created only CT 306 and its placement helper (`2 added,
+0 changed, 0 destroyed`). All existing workloads and Golden 9000/9001 were
+unchanged. The provider is pinned to `bpg/proxmox 0.115.0`.
 
 ## Architecture overview
 
@@ -103,6 +103,7 @@ private network design rather than documented in this public repository.
 | Node03 | 303 | LXC | `horus-wiki-srv01` | 101 |
 | Node03 | 304 | LXC | `horus-git-srv01` | 101 |
 | Node03 | 305 | LXC | `horus-reg-srv01` | 101 |
+| Node03 | 306 | LXC | `horus-vkj-srv01` | 101 |
 | Node04 | 401 | LXC | `horus-grf-srv01` | 150 |
 | Node04 | 402 | LXC | `horus-pm-srv01` | 150 |
 | Node04 | 403 | LXC | `horus-lok-srv01` | 150 |
@@ -110,12 +111,17 @@ private network design rather than documented in this public repository.
 | Node04 | 405 | LXC | `horus-s3-srv01` | 150 |
 | Node04 | 406 | LXC | `horus-ai-srv03` | 150 |
 
-Node totals are 8 / 9 / 5 / 6. Node01 uses VMIDs 101-108. VMIDs 306-307 are
-reserved and are not created by Terraform. Registry is desired as
+Node totals are 8 / 9 / 6 / 6. Node01 uses VMIDs 101-108. VMID 307 is
+reserved and is not created by Terraform. Registry is desired as
 `horus-reg-srv01`, VMID 305 (previously 306), on `horus-pmx-node03`, at
 `10.10.1.36/24` on VLAN 101, with a `local-lvm` root and `artifacts-data`
 persistent storage. The reassignment required a controlled replacement and is
 now verified converged by the refreshed plan.
+
+`horus-vkj-srv01` is the dedicated Vikunja application LXC on Node03/VLAN 101.
+Terraform owns its VMID 306, compute, network, placement, boot policy and
+private `infra-data` attachment. HoRus-Basis/Ansible owns Vikunja, its database
+configuration and application lifecycle; PostgreSQL is provided by DB03.
 
 `horus-gg-srv01` is the isolated GitGuardian CLI/ggshield, TruffleHog and
 Trivy security scanner. Terraform creates the LXC, sets its identity, compute,
@@ -198,7 +204,7 @@ mount-point volumes. It is not shared application data.
 | Mimir, AI PostgreSQL, Qdrant | Node02 / respective workloads | `mimir-data` |
 | Infrastructure PostgreSQL | Node03 / `horus-db-srv03` | provider-allocated `pg-local` volume |
 | Infrastructure PostgreSQL weekly backups | Node03 / `horus-db-srv03` | provider-allocated 8 GiB `storage-infra` volume |
-| Wiki, Gitea | Node03 / respective workloads | `storage-infra` |
+| Wiki, Gitea, Vikunja | Node03 / respective workloads | `storage-infra` |
 | OCI Registry | Node03 / `horus-reg-srv01` | `artifacts-data` |
 | MinIO | Node04 / `horus-s3-srv01` | `logs-data` |
 

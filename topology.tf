@@ -122,6 +122,7 @@ locals {
     "horus-wiki-srv01" = { vmid = 303, hostname = "horus-wiki-srv01", type = "lxc", target_node = "horus-pmx-node03", cores = 1, memory = 768, disk_size = "12", ip_address = var.environment.workload_ips["horus-wiki-srv01"], vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "infra-data", path = var.environment.guest_paths["infra-wiki"], size = "0" }] }
     "horus-git-srv01"  = { vmid = 304, hostname = "horus-git-srv01", type = "lxc", target_node = "horus-pmx-node03", cores = 2, memory = 1536, disk_size = "12", ip_address = var.environment.workload_ips["horus-git-srv01"], vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "infra-data", path = var.environment.guest_paths["infra-gitea"], size = "0" }] }
     "horus-reg-srv01"  = { vmid = 305, hostname = "horus-reg-srv01", type = "lxc", target_node = "horus-pmx-node03", cores = 2, memory = 2048, disk_size = "16", ip_address = var.environment.workload_ips["horus-reg-srv01"], vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "artifacts-data", path = var.environment.guest_paths["artifacts-registry"], size = "0" }] }
+    "horus-vkj-srv01"  = { vmid = 306, hostname = "horus-vkj-srv01", type = "lxc", target_node = "horus-pmx-node03", cores = 1, memory = 1024, disk_size = "12", ip_address = var.environment.workload_ips["horus-vkj-srv01"], vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "infra-data", path = var.environment.guest_paths["infra-vikunja"], size = "0" }] }
 
     "horus-grf-srv01"  = { vmid = 401, hostname = "horus-grf-srv01", type = "lxc", target_node = "horus-pmx-node04", cores = 1, memory = 1024, disk_size = "10", ip_address = var.environment.workload_ips["horus-grf-srv01"], vlan_id = 150, feature_profile = "standard" }
     "horus-pm-srv01"   = { vmid = 402, hostname = "horus-pm-srv01", type = "lxc", target_node = "horus-pmx-node04", cores = 2, memory = 2048, disk_size = "12", ip_address = var.environment.workload_ips["horus-pm-srv01"], vlan_id = 150, feature_profile = "standard" }
@@ -169,8 +170,8 @@ locals {
 
 check "inventory" {
   assert {
-    condition     = length(local.workloads) == 28 && length(local.lxc_workloads) == 22 && length(local.vm_workloads) == 6
-    error_message = "HoRus inventory must contain exactly 28 workloads: 22 LXC and 6 VM."
+    condition     = length(local.workloads) == 29 && length(local.lxc_workloads) == 23 && length(local.vm_workloads) == 6
+    error_message = "HoRus inventory must contain exactly 29 workloads: 23 LXC and 6 VM."
   }
 }
 
@@ -198,7 +199,7 @@ check "placement_and_reserved_ids" {
         contains(keys(local.nodes), workload.target_node) &&
         (workload.target_node == "horus-pmx-node01" ? workload.vmid >= 101 && workload.vmid <= 108 :
           workload.target_node == "horus-pmx-node02" ? workload.vmid >= 201 && workload.vmid <= 209 :
-          workload.target_node == "horus-pmx-node03" ? workload.vmid >= 301 && workload.vmid <= 305 :
+          workload.target_node == "horus-pmx-node03" ? workload.vmid >= 301 && workload.vmid <= 306 :
         workload.vmid >= 401 && workload.vmid <= 406)
       )]) &&
       !contains([for workload in values(local.workloads) : workload.vmid], 307) &&
@@ -266,6 +267,19 @@ check "retired_names_absent" {
   }
 }
 
+check "vikunja_contract" {
+  assert {
+    condition = (
+      local.workloads["horus-vkj-srv01"].vmid == 306 &&
+      local.workloads["horus-vkj-srv01"].target_node == "horus-pmx-node03" &&
+      local.workloads["horus-vkj-srv01"].vlan_id == 101 &&
+      local.workloads["horus-vkj-srv01"].private_mounts[0].storage_name == "infra-data" &&
+      local.workloads["horus-vkj-srv01"].private_mounts[0].path == var.environment.guest_paths["infra-vikunja"]
+    )
+    error_message = "Vikunja identity, placement, network or private storage contract changed."
+  }
+}
+
 # Keep the accepted thin-provisioning risk explicit and detect any unreviewed
 # capacity drift. Workload sizes are not reduced to make this assertion pass.
 check "local_lvm_capacity_accounting" {
@@ -274,7 +288,7 @@ check "local_lvm_capacity_accounting" {
       local.local_lvm_logical_root_gib == {
         "horus-pmx-node01" = 140
         "horus-pmx-node02" = 136
-        "horus-pmx-node03" = 84
+        "horus-pmx-node03" = 96
         "horus-pmx-node04" = 78
       } &&
       alltrue([for node in keys(local.nodes) : local.local_lvm_overcommit_ratio[node] > 1])

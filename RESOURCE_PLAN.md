@@ -1,7 +1,7 @@
 # HoRus resource and capacity plan
 
-Authoritative topology: 28 workloads, 22 LXC and 6 VM. Node totals are
-8 / 9 / 5 / 6. LXC roots must be at
+Authoritative topology: 29 workloads, 23 LXC and 6 VM. Node totals are
+8 / 9 / 6 / 6. LXC roots must be at
 least the Golden 9001 baseline of 8 GiB; VM roots must be at least the Golden
 9000 baseline of 12 GiB. Grafana VMID 401 remains valid at 10 GiB.
 
@@ -14,7 +14,7 @@ filled roots exceed physical capacity on all four nodes.
 |---|---:|---:|---:|---:|---:|
 | Node01 | 130.27 | 140 | 0 | 140 | 1.07x |
 | Node02 | 49.34 | 136 | 0 | 136 | 2.76x |
-| Node03 | 53.93 | 72 | 12 (VM 9000) | 84 | 1.56x |
+| Node03 | 53.93 | 84 | 12 (VM 9000) | 96 | 1.78x |
 | Node04 | 53.93 | 78 | 0 | 78 | 1.45x |
 
 Node01 now has a small reviewed thin-provisioning overcommit. Its eight
@@ -22,6 +22,11 @@ workloads allocate 20 vCPU and 26 GiB RAM. The configuration reports this
 thin-provisioning risk and does not resize
 approved workloads to hide it. No root has been moved to `storage-infra` as a
 capacity workaround; any such change requires explicit approval.
+
+Node03 allocates 10 vCPU and 9.25 GiB RAM after adding the dedicated Vikunja
+LXC. Its 12 GiB root raises workload roots from 72 to 84 GiB; with external
+Golden VM 9000, accounted logical allocation is 96 GiB on 53.93 GiB physical
+`local-lvm` (approximately 1.78x).
 
 ## Persistent storage
 
@@ -33,7 +38,7 @@ Private owners:
   `pg-local:301/subvol-301-disk-0.subvol`, Node03-local directory datastore;
 - infrastructure PostgreSQL weekly backups -> provider-allocated 8 GiB
   `storage-infra:301/vm-301-disk-1.raw`, shared NFS datastore;
-- Wiki/Gitea -> existing `storage-infra`, Node03;
+- Wiki/Gitea/Vikunja -> existing `storage-infra`, Node03;
 - OCI Registry -> `artifacts-data`, Node03;
 - MinIO -> `logs-data`, Node04.
 

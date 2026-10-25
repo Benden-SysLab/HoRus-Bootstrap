@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Terraform-Bootstrap für den neu aufgebauten HoRus-Proxmox-VE-Cluster mit vier
-Knoten. Das Repository verwaltet 28 Workloads: 22 unprivilegierte
+Knoten. Das Repository verwaltet 29 Workloads: 23 unprivilegierte
 LXC-Container und 6 virtuelle Maschinen.
 
 Vollständige Referenz: [README.md](README.md). Architekturdetails:
@@ -76,15 +76,19 @@ Kubernetes: Pod CIDR `private`, Service CIDR `private`.
 |---|---|---|---:|
 | Node01 | 101 `horus-lb-srv01`, 102 `horus-agent-srv01`, 104 `horus-ai-srv01`, 105 `horus-db-srv01`, 108 `horus-gg-srv01` | 103 `horus-jnk-srv01`, 106 `horus-media-srv01`, 107 `horus-k8sw-srv01` | 8 |
 | Node02 | 201 `horus-ans-srv01`, 202 `horus-ai-srv02`, 203 `horus-db-srv02`, 204 `horus-vec-srv01`, 205 `horus-cache-srv01`, 206 `horus-iam-srv01`, 207 `horus-media-srv02` | 208 `horus-k8sw-srv02`, 209 `horus-k8sc-srv01` | 9 |
-| Node03 | 301 `horus-db-srv03`, 303 `horus-wiki-srv01`, 304 `horus-git-srv01`, 305 `horus-reg-srv01` | 302 `horus-vlt-srv01` | 5 |
+| Node03 | 301 `horus-db-srv03`, 303 `horus-wiki-srv01`, 304 `horus-git-srv01`, 305 `horus-reg-srv01`, 306 `horus-vkj-srv01` | 302 `horus-vlt-srv01` | 6 |
 | Node04 | 401 `horus-grf-srv01`, 402 `horus-pm-srv01`, 403 `horus-lok-srv01`, 404 `horus-otel-srv01`, 405 `horus-s3-srv01`, 406 `horus-ai-srv03` | — | 6 |
-| **Gesamt** | **22 LXC** | **6 VM** | **28** |
+| **Gesamt** | **23 LXC** | **6 VM** | **29** |
 
-VMIDs 306-307 sind reserviert und werden nicht erstellt. Registry ist als
+VMID 307 ist reserviert und wird nicht erstellt. Registry ist als
 `horus-reg-srv01`, VMID 305 (zuvor 306), auf `horus-pmx-node03` mit
 `10.10.1.36/24`, VLAN 101, `local-lvm`-Root und persistentem
 `artifacts-data`-Storage definiert. Die kontrollierte Ersetzung ist durch den
 konvergierten aktualisierten Plan bestätigt.
+
+`horus-vkj-srv01` ist der dedizierte Vikunja-LXC auf Node03/VLAN 101. Terraform
+verwaltet VMID 306, Ressourcen, Netzwerk, Placement und den privaten
+`infra-data`-Mount; HoRus-Basis/Ansible verwaltet Anwendung und DB03-Anbindung.
 
 Node01 nutzt VMIDs 101-108. `horus-gg-srv01` (VMID 108, LXC, VLAN 150) ist der isolierte GitGuardian CLI/ggshield-, TruffleHog- und Trivy-Scanner. Terraform erstellt und platziert den LXC, verschiebt das rootfs nach `local-lvm`, startet ihn und setzt `start_on_boot`; Ansible/service automation installiert und konfiguriert Scanner, Zeitpläne, Credentials und CI-Integration. Node01: 20 vCPU, 26 GiB RAM, 140 GiB logische Roots auf 130.27 GiB physischem `local-lvm` (ca. 1.07x Thin-Provisioning).
 

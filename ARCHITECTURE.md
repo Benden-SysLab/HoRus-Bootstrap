@@ -11,17 +11,17 @@ metadata, workloads and storage consumers exactly once. `main.tf` derives
 `for_each` VM and LXC module instances; scripts do not contain a second workload
 inventory.
 
-The target cluster contains 28 managed workloads: 22 LXC and 6 VM.
+The target cluster contains 29 managed workloads: 23 LXC and 6 VM.
 
 | Final node | VMID range | LXC | VM | Total |
 |---|---:|---:|---:|---:|
 | `horus-pmx-node01` | 101-108 | 5 | 3 | 8 |
 | `horus-pmx-node02` | 201-209 | 7 | 2 | 9 |
-| `horus-pmx-node03` | 301-305 | 4 | 1 | 5 |
+| `horus-pmx-node03` | 301-306 | 5 | 1 | 6 |
 | `horus-pmx-node04` | 401-406 | 6 | 0 | 6 |
-| **Total** |  | **22** | **6** | **28** |
+| **Total** |  | **23** | **6** | **29** |
 
-VMIDs 306-307 are reserved. Golden VMIDs 9000 and 9001 are external prerequisites
+VMID 307 is reserved. Golden VMIDs 9000 and 9001 are external prerequisites
 and remain outside Terraform state.
 
 The empty `horus-work-srv01` Workspace is retired. KasmVNC and code-server are
@@ -36,6 +36,10 @@ GitGuardian CLI/ggshield, TruffleHog and Trivy scanning. Terraform owns its
 existence, identity, compute, network, placement, rootfs move to `local-lvm`,
 start and `start_on_boot`. Ansible/service automation owns scanner installation,
 schedules, credentials and CI integration.
+
+VMID 306 is `horus-vkj-srv01`, a dedicated Vikunja LXC on Node03/VLAN 101.
+Terraform owns its infrastructure lifecycle and private `infra-data` mount;
+HoRus-Basis/Ansible owns the application and its DB03 PostgreSQL integration.
 
 ## Ownership boundaries
 
@@ -147,7 +151,7 @@ final plans or perpetual helper replacement. Provider state ignores only the
 three externally completed runtime/rootfs fields, while the helper validates
 their actual final state.
 
-After the completed rollout, the normal read/refresh path was verified with:
+After the v2.2.0 Vikunja rollout, the normal read/refresh path was verified with:
 
 ```text
 terraform plan -parallelism=5
@@ -185,7 +189,7 @@ Proxmox-managed storage-backed LXC mount points on the physical owner node.
 | `guardian-data` | Node01 | `/private/environment/path` | Guardian PostgreSQL |
 | `mimir-data` | Node02 | `/private/environment/path` | Mimir, AI PostgreSQL, Qdrant |
 | `pg-local` | Node03 | `/private/environment/path` | infrastructure PostgreSQL VMID 301 |
-| `storage-infra` | Node03 | `/private/environment/path` | Wiki, Gitea, DB03 weekly backup; also Golden 9001 clone storage |
+| `storage-infra` | Node03 | `/private/environment/path` | Wiki, Gitea, Vikunja, DB03 weekly backup; also Golden 9001 clone storage |
 | `artifacts-data` | Node03 | `/private/environment/path` | OCI Registry |
 | `logs-data` | Node04 | `/private/environment/path` | MinIO |
 
@@ -239,7 +243,7 @@ state.
 ## Safety invariants
 
 - Golden 9000 and 9001 are never Terraform-managed.
-- VMIDs 306-307 remain reserved.
+- VMID 307 remains reserved.
 - Unexpected identity, node, storage, lock or network state fails closed.
 - Disk shrinking and automatic guest unlock are forbidden.
 - Physical storage roots must be mounted and verified before apply.

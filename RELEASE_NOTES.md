@@ -1,5 +1,47 @@
 # HoRus-Bootstrap release notes
 
+## v2.2.0
+
+Release: `v2.2.0`.
+
+### Vikunja workload
+
+- Added the dedicated `horus-vkj-srv01` unprivileged LXC as VMID 306 on
+  `horus-pmx-node03`, VLAN 101, with 1 vCPU, 1024 MiB RAM and a 12 GiB root.
+- Added its private `infra-data` attachment for Vikunja application data. The
+  operational IP and guest path remain environment-specific values in the
+  ignored `terraform.tfvars`.
+- Kept PostgreSQL ownership on DB03 and application configuration in
+  HoRus-Basis/Ansible; this release provisions infrastructure only.
+
+### Inventory and capacity
+
+- Updated the authoritative inventory to 29 workloads: 23 LXC and 6 VM,
+  distributed 8 / 9 / 6 / 6 across Node01-Node04.
+- Node03 now allocates 10 vCPU, 9.25 GiB RAM and 84 GiB of workload roots.
+  Including external Golden VM 9000, its accounted logical `local-lvm`
+  allocation is 96 GiB on 53.93 GiB physical capacity (about 1.78x).
+- VMID 307 remains reserved; Golden 9000 and 9001 remain external and
+  Terraform-unmanaged.
+
+### Rollout
+
+- First creation uses the existing two-phase LXC lifecycle and
+  `terraform apply -parallelism=1` because Golden CT 9001 is a clone lock
+  domain.
+- Steady-state operations return to `terraform plan/apply -parallelism=5`.
+- Guarded plan: `2 to add, 0 to change, 0 to destroy`, limited to CT 306 and
+  its placement helper.
+- Apply: `2 added, 0 changed, 0 destroyed`; placement verification confirmed
+  Node03, `local-lvm`, running state, `onboot=1`, VLAN 101 and the private
+  `storage-infra` mount.
+- `terraform fmt -check -recursive`: passed.
+- `terraform validate`: passed.
+- `terraform test`: 5 passed, 0 failed.
+- Offline LXC placement tests: 7 passed.
+- Final `terraform plan -parallelism=5`: `No changes. Your infrastructure
+  matches the configuration.`
+
 ## v2.1.1
 
 Release: `v2.1.1`.

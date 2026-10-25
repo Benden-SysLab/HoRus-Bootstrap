@@ -1,12 +1,16 @@
 # HoRus-Bootstrap backlog
 
-The four-node Terraform bootstrap, 28-workload inventory (22 LXC and 6 VM), Golden 9000/9001
+The four-node Terraform bootstrap, 29-workload inventory (23 LXC and 6 VM), Golden 9000/9001
 model, provider-native VM lifecycle, two-phase LXC placement and idempotent
 steady state are complete.
 
 Real network, NFS and physical-path coordinates are intentionally kept in the
 ignored `terraform.tfvars`; the tracked topology retains the full HoRus
 inventory, placement and logical storage ownership model.
+
+Vikunja infrastructure is represented by the dedicated `horus-vkj-srv01`
+LXC on Node03. Guest application installation and DB03 integration remain an
+HoRus-Basis/Ansible responsibility.
 
 ## Future work
 

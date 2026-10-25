@@ -50,6 +50,7 @@ environment = {
     horus-wiki-srv01 = "198.51.100.10/28"
     horus-git-srv01 = "198.51.100.11/28"
     horus-reg-srv01 = "198.51.100.13/28"
+    horus-vkj-srv01 = "198.51.100.14/28"
     horus-grf-srv01 = "198.51.100.84/28"
     horus-pm-srv01 = "198.51.100.85/28"
     horus-lok-srv01 = "198.51.100.86/28"
@@ -80,6 +81,7 @@ environment = {
     infra-backups      = "/data/example/infra/backups"
     infra-wiki         = "/data/example/infra/wiki"
     infra-gitea        = "/data/example/infra/gitea"
+    infra-vikunja      = "/data/example/infra/vikunja"
     artifacts-registry = "/data/example/artifacts/registry"
     logs               = "/data/example/logs"
   }
