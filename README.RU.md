@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Terraform-bootstrap обновлённого четырёхнодового кластера HoRus Proxmox VE.
-Репозиторий управляет 29 workloads: 23 непривилегированными LXC-контейнерами и
+Репозиторий управляет 28 workloads: 22 непривилегированными LXC-контейнерами и
 6 виртуальными машинами, включая их размещение, вычислительные ресурсы, сеть и
 подключение приватных хранилищ.
 
@@ -11,15 +11,19 @@ English documentation: [README.md](README.md). Подробная архитек
 ## Статус
 
 Текущее desired state развёрнуто и приведено к сходящемуся состоянию. После
-создания LXC Vikunja `terraform plan -parallelism=5` вернул:
+удаления дублирующего Ansible-хоста и уплотнения VMID Node02
+`terraform plan -parallelism=5` вернул:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Apply v2.2.0 создал только CT 306 и его placement helper (`2 added, 0 changed,
-0 destroyed`). Все существующие workloads и Golden 9000/9001 остались без
-изменений. Используется фиксированная версия `bpg/proxmox 0.115.0`.
+Rollout v2.2.1 удалил `horus-ans-srv01` и пересоздал только утверждённые
+workloads Node02, чьи VMID изменились. IAM остался работать как VMID 206;
+Golden 9000/9001 не изменялись. Используется `bpg/proxmox 0.115.0`.
+
+Ansible control tooling переносится на существующий Jenkins agent
+`horus-agent-srv01`; его guest-конфигурацией управляет HoRus-Basis.
 
 ## Обзор архитектуры
 
@@ -47,7 +51,7 @@ KasmVNC и code-server не являются активными сервисам
 | Node | CPU | RAM | Основная роль |
 |---|---|---:|---|
 | `horus-pmx-node01` | Xeon E3-1275v2 | ~31 GiB | Guardian/security, CI, load balancing, CasaOS/media, Kubernetes worker |
-| `horus-pmx-node02` | Xeon E3-1275v2, RTX 3060 12 GB | ~31 GiB | Mimir AI, Ansible, Authentik, Joyfilm, Kubernetes |
+| `horus-pmx-node02` | Xeon E3-1275v2, RTX 3060 12 GB | ~31 GiB | Mimir AI, Authentik, Joyfilm, Kubernetes |
 | `horus-pmx-node03` | i7-3770K | ~15.6 GiB | Storage, Golden factory, core infrastructure |
 | `horus-pmx-node04` | i5-4210U | ~15.5 GiB | Observability, System Guardian |
 
@@ -89,15 +93,14 @@ Kubernetes Pod и Service CIDR относятся к environment-specific сет
 | Node01 | 106 | VM | `horus-media-srv01` | private | 101 |
 | Node01 | 107 | VM | `horus-k8sw-srv01` | private | 180 |
 | Node01 | 108 | LXC | `horus-gg-srv01` | private | 150 |
-| Node02 | 201 | LXC | `horus-ans-srv01` | private | 101 |
-| Node02 | 202 | LXC | `horus-ai-srv02` | private | 160 |
-| Node02 | 203 | LXC | `horus-db-srv02` | private | 160 |
-| Node02 | 204 | LXC | `horus-vec-srv01` | private | 160 |
-| Node02 | 205 | LXC | `horus-cache-srv01` | private | 160 |
+| Node02 | 201 | LXC | `horus-ai-srv02` | private | 160 |
+| Node02 | 202 | LXC | `horus-db-srv02` | private | 160 |
+| Node02 | 203 | LXC | `horus-vec-srv01` | private | 160 |
+| Node02 | 204 | LXC | `horus-cache-srv01` | private | 160 |
+| Node02 | 205 | LXC | `horus-media-srv02` | private | 101 |
 | Node02 | 206 | LXC | `horus-iam-srv01` | private | 101 |
-| Node02 | 207 | LXC | `horus-media-srv02` | private | 101 |
-| Node02 | 208 | VM | `horus-k8sw-srv02` | private | 180 |
-| Node02 | 209 | VM | `horus-k8sc-srv01` | private | 180 |
+| Node02 | 207 | VM | `horus-k8sw-srv02` | private | 180 |
+| Node02 | 208 | VM | `horus-k8sc-srv01` | private | 180 |
 | Node03 | 301 | LXC | `horus-db-srv03` | private | 101 |
 | Node03 | 302 | VM | `horus-vlt-srv01` | private | 101 |
 | Node03 | 303 | LXC | `horus-wiki-srv01` | private | 101 |

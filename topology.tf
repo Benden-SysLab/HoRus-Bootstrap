@@ -107,15 +107,14 @@ locals {
     "horus-k8sw-srv01"  = { vmid = 107, hostname = "horus-k8sw-srv01", type = "vm", target_node = "horus-pmx-node01", cores = 3, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-k8sw-srv01"], vlan_id = 180 }
     "horus-gg-srv01"    = { vmid = 108, hostname = "horus-gg-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 2, memory = 2048, disk_size = "16", ip_address = var.environment.workload_ips["horus-gg-srv01"], vlan_id = 150, feature_profile = "standard" }
 
-    "horus-ans-srv01"   = { vmid = 201, hostname = "horus-ans-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 2048, disk_size = "12", ip_address = var.environment.workload_ips["horus-ans-srv01"], vlan_id = 101, feature_profile = "standard" }
-    "horus-ai-srv02"    = { vmid = 202, hostname = "horus-ai-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 6144, disk_size = "20", ip_address = var.environment.workload_ips["horus-ai-srv02"], vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = var.environment.guest_paths["mimir-data"], size = "0" }] }
-    "horus-db-srv02"    = { vmid = 203, hostname = "horus-db-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 4096, disk_size = "16", ip_address = var.environment.workload_ips["horus-db-srv02"], vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = var.environment.guest_paths["mimir-postgres"], size = "0" }] }
-    "horus-vec-srv01"   = { vmid = 204, hostname = "horus-vec-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-vec-srv01"], vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = var.environment.guest_paths["mimir-vectors"], size = "0" }] }
-    "horus-cache-srv01" = { vmid = 205, hostname = "horus-cache-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 1024, disk_size = "12", ip_address = var.environment.workload_ips["horus-cache-srv01"], vlan_id = 160, feature_profile = "standard" }
+    "horus-ai-srv02"    = { vmid = 201, hostname = "horus-ai-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 6144, disk_size = "20", ip_address = var.environment.workload_ips["horus-ai-srv02"], vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = var.environment.guest_paths["mimir-data"], size = "0" }] }
+    "horus-db-srv02"    = { vmid = 202, hostname = "horus-db-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 4096, disk_size = "16", ip_address = var.environment.workload_ips["horus-db-srv02"], vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = var.environment.guest_paths["mimir-postgres"], size = "0" }] }
+    "horus-vec-srv01"   = { vmid = 203, hostname = "horus-vec-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 4, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-vec-srv01"], vlan_id = 160, feature_profile = "standard", private_mounts = [{ storage_name = "mimir-data", path = var.environment.guest_paths["mimir-vectors"], size = "0" }] }
+    "horus-cache-srv01" = { vmid = 204, hostname = "horus-cache-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 1024, disk_size = "12", ip_address = var.environment.workload_ips["horus-cache-srv01"], vlan_id = 160, feature_profile = "standard" }
     "horus-iam-srv01"   = { vmid = 206, hostname = "horus-iam-srv01", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 2048, disk_size = "12", ip_address = var.environment.workload_ips["horus-iam-srv01"], vlan_id = 101, feature_profile = "standard" }
-    "horus-media-srv02" = { vmid = 207, hostname = "horus-media-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 2048, disk_size = "16", ip_address = var.environment.workload_ips["horus-media-srv02"], vlan_id = 101, feature_profile = "storage", shared_datasets = [{ storage_name = "media", path = var.environment.guest_paths["media"], read_only = false }] }
-    "horus-k8sw-srv02"  = { vmid = 208, hostname = "horus-k8sw-srv02", type = "vm", target_node = "horus-pmx-node02", cores = 3, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-k8sw-srv02"], vlan_id = 180 }
-    "horus-k8sc-srv01"  = { vmid = 209, hostname = "horus-k8sc-srv01", type = "vm", target_node = "horus-pmx-node02", cores = 2, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-k8sc-srv01"], vlan_id = 180 }
+    "horus-media-srv02" = { vmid = 205, hostname = "horus-media-srv02", type = "lxc", target_node = "horus-pmx-node02", cores = 2, memory = 2048, disk_size = "16", ip_address = var.environment.workload_ips["horus-media-srv02"], vlan_id = 101, feature_profile = "storage", shared_datasets = [{ storage_name = "media", path = var.environment.guest_paths["media"], read_only = false }] }
+    "horus-k8sw-srv02"  = { vmid = 207, hostname = "horus-k8sw-srv02", type = "vm", target_node = "horus-pmx-node02", cores = 3, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-k8sw-srv02"], vlan_id = 180 }
+    "horus-k8sc-srv01"  = { vmid = 208, hostname = "horus-k8sc-srv01", type = "vm", target_node = "horus-pmx-node02", cores = 2, memory = 3072, disk_size = "16", ip_address = var.environment.workload_ips["horus-k8sc-srv01"], vlan_id = 180 }
 
     "horus-db-srv03"   = { vmid = 301, hostname = "horus-db-srv03", type = "lxc", target_node = "horus-pmx-node03", cores = 2, memory = 2560, disk_size = "16", ip_address = var.environment.workload_ips["horus-db-srv03"], vlan_id = 101, feature_profile = "standard", private_mounts = [{ storage_name = "postgres-local", path = var.environment.guest_paths["infra-postgres"], size = "0" }, { storage_name = "infra-backup", path = var.environment.guest_paths["infra-backups"], size = local.storage_inventory["infra-backup"].managed_volume_size }] }
     "horus-vlt-srv01"  = { vmid = 302, hostname = "horus-vlt-srv01", type = "vm", target_node = "horus-pmx-node03", cores = 2, memory = 1536, disk_size = "16", ip_address = var.environment.workload_ips["horus-vlt-srv01"], vlan_id = 101 }
@@ -170,8 +169,8 @@ locals {
 
 check "inventory" {
   assert {
-    condition     = length(local.workloads) == 29 && length(local.lxc_workloads) == 23 && length(local.vm_workloads) == 6
-    error_message = "HoRus inventory must contain exactly 29 workloads: 23 LXC and 6 VM."
+    condition     = length(local.workloads) == 28 && length(local.lxc_workloads) == 22 && length(local.vm_workloads) == 6
+    error_message = "HoRus inventory must contain exactly 28 workloads: 22 LXC and 6 VM."
   }
 }
 
@@ -198,7 +197,7 @@ check "placement_and_reserved_ids" {
       alltrue([for workload in values(local.workloads) : (
         contains(keys(local.nodes), workload.target_node) &&
         (workload.target_node == "horus-pmx-node01" ? workload.vmid >= 101 && workload.vmid <= 108 :
-          workload.target_node == "horus-pmx-node02" ? workload.vmid >= 201 && workload.vmid <= 209 :
+          workload.target_node == "horus-pmx-node02" ? workload.vmid >= 201 && workload.vmid <= 208 :
           workload.target_node == "horus-pmx-node03" ? workload.vmid >= 301 && workload.vmid <= 306 :
         workload.vmid >= 401 && workload.vmid <= 406)
       )]) &&
@@ -262,8 +261,25 @@ check "storage_boundaries" {
 
 check "retired_names_absent" {
   assert {
-    condition     = alltrue([for retired in ["horus-ai-srv04", "horus-work-srv01"] : !contains(keys(local.workloads), retired)])
+    condition     = alltrue([for retired in ["horus-ai-srv04", "horus-work-srv01", "horus-ans-srv01"] : !contains(keys(local.workloads), retired)])
     error_message = "Retired workload names must remain absent."
+  }
+}
+
+check "node02_compaction_contract" {
+  assert {
+    condition = (
+      local.workloads["horus-ai-srv02"].vmid == 201 &&
+      local.workloads["horus-db-srv02"].vmid == 202 &&
+      local.workloads["horus-vec-srv01"].vmid == 203 &&
+      local.workloads["horus-cache-srv01"].vmid == 204 &&
+      local.workloads["horus-media-srv02"].vmid == 205 &&
+      local.workloads["horus-iam-srv01"].vmid == 206 &&
+      local.workloads["horus-k8sw-srv02"].vmid == 207 &&
+      local.workloads["horus-k8sc-srv01"].vmid == 208 &&
+      !contains([for workload in values(local.workloads) : workload.vmid], 209)
+    )
+    error_message = "Node02 VMIDs must remain compact while IAM stays at deployed VMID 206."
   }
 }
 
@@ -287,7 +303,7 @@ check "local_lvm_capacity_accounting" {
     condition = (
       local.local_lvm_logical_root_gib == {
         "horus-pmx-node01" = 140
-        "horus-pmx-node02" = 136
+        "horus-pmx-node02" = 124
         "horus-pmx-node03" = 96
         "horus-pmx-node04" = 78
       } &&

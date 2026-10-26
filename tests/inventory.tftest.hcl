@@ -36,7 +36,6 @@ variables {
       horus-media-srv01 = "198.51.100.4/28"
       horus-k8sw-srv01  = "198.51.100.130/28"
       horus-gg-srv01    = "198.51.100.90/28"
-      horus-ans-srv01   = "198.51.100.5/28"
       horus-ai-srv02    = "198.51.100.98/28"
       horus-db-srv02    = "198.51.100.99/28"
       horus-vec-srv01   = "198.51.100.100/28"
@@ -97,15 +96,15 @@ run "authoritative_inventory_and_boundaries" {
   command = plan
 
   assert {
-    condition     = length(local.workloads) == 29 && length(local.lxc_workloads) == 23 && length(local.vm_workloads) == 6
-    error_message = "Expected 29 workloads: 23 LXC and 6 VM."
+    condition     = length(local.workloads) == 28 && length(local.lxc_workloads) == 22 && length(local.vm_workloads) == 6
+    error_message = "Expected 28 workloads: 22 LXC and 6 VM."
   }
   assert {
     condition = {
       for node in keys(local.nodes) : node => length([for workload in values(local.workloads) : workload if workload.target_node == node])
       } == {
       "horus-pmx-node01" = 8
-      "horus-pmx-node02" = 9
+      "horus-pmx-node02" = 8
       "horus-pmx-node03" = 6
       "horus-pmx-node04" = 6
     }
@@ -160,12 +159,26 @@ run "authoritative_inventory_and_boundaries" {
     error_message = "Retired workloads returned or OCI Registry did not take approved VMID 305."
   }
   assert {
-    condition     = local.local_lvm_logical_root_gib["horus-pmx-node01"] == 140 && local.local_lvm_logical_root_gib["horus-pmx-node02"] == 136 && local.local_lvm_logical_root_gib["horus-pmx-node03"] == 96 && local.local_lvm_logical_root_gib["horus-pmx-node04"] == 78
+    condition     = local.local_lvm_logical_root_gib["horus-pmx-node01"] == 140 && local.local_lvm_logical_root_gib["horus-pmx-node02"] == 124 && local.local_lvm_logical_root_gib["horus-pmx-node03"] == 96 && local.local_lvm_logical_root_gib["horus-pmx-node04"] == 78
     error_message = "Capacity arithmetic changed."
   }
   assert {
-    condition     = length(local.nodes) == 4 && length(local.vlans) == 9 && length(local.workloads) == 29
+    condition     = length(local.nodes) == 4 && length(local.vlans) == 9 && length(local.workloads) == 28
     error_message = "Extra environment mappings must not create topology objects."
+  }
+  assert {
+    condition = (
+      !contains(keys(local.workloads), "horus-ans-srv01") &&
+      local.workloads["horus-ai-srv02"].vmid == 201 &&
+      local.workloads["horus-db-srv02"].vmid == 202 &&
+      local.workloads["horus-vec-srv01"].vmid == 203 &&
+      local.workloads["horus-cache-srv01"].vmid == 204 &&
+      local.workloads["horus-media-srv02"].vmid == 205 &&
+      local.workloads["horus-iam-srv01"].vmid == 206 &&
+      local.workloads["horus-k8sw-srv02"].vmid == 207 &&
+      local.workloads["horus-k8sc-srv01"].vmid == 208
+    )
+    error_message = "Node02 compaction changed or deployed IAM VMID 206 moved."
   }
   assert {
     condition = (
@@ -173,7 +186,8 @@ run "authoritative_inventory_and_boundaries" {
       local.workloads["horus-gg-srv01"].type == "lxc" &&
       local.workloads["horus-gg-srv01"].target_node == "horus-pmx-node01" &&
       local.workloads["horus-gg-srv01"].vlan_id == 150 &&
-      local.workloads["horus-vec-srv01"].vmid == 204
+      local.workloads["horus-vec-srv01"].vmid == 203 &&
+      local.workloads["horus-iam-srv01"].vmid == 206
     )
     error_message = "Security scanner or existing vector workload identity changed."
   }

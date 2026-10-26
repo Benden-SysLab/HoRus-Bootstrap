@@ -1,5 +1,44 @@
 # HoRus-Bootstrap release notes
 
+## v2.2.1
+
+Release: `v2.2.1`.
+
+### Duplicate Ansible host removal and VMID correction
+
+- Removed the redundant dedicated `horus-ans-srv01` LXC. Ansible control
+  tooling is assigned to the existing `horus-agent-srv01` Jenkins agent and
+  remains owned by HoRus-Basis guest configuration.
+- Corrected the compact Node02 numbering after that removal:
+  `horus-ai-srv02` 202 -> 201, `horus-db-srv02` 203 -> 202,
+  `horus-vec-srv01` 204 -> 203, `horus-cache-srv01` 205 -> 204,
+  `horus-media-srv02` 207 -> 205, `horus-k8sw-srv02` 208 -> 207 and
+  `horus-k8sc-srv01` 209 -> 208.
+- Preserved the already deployed `horus-iam-srv01` as VMID 206. VMID 209 is
+  now free and the retired Ansible hostname is blocked by topology validation.
+- Updated the authoritative inventory to 28 workloads: 22 LXC and 6 VM,
+  distributed 8 / 8 / 6 / 6 across Node01-Node04.
+
+### Guarded rollout and verification
+
+- Used a two-stage Terraform rollout to prevent collisions between old and new
+  neighboring VMIDs. Stage 1 destroyed 14 approved objects: the retired
+  Ansible CT/helper plus the resources/helpers whose identities were changing.
+- Stage 2 created 12 approved objects: five LXC resources with placement
+  helpers and two VM resources (`12 added, 0 changed, 0 destroyed`). LXC work
+  was serialized with `-parallelism=1` because Golden CT 9001 is a clone lock
+  domain.
+- Direct Proxmox verification confirmed CT 201-206 and VM 207-208 running with
+  `onboot=1`; all recreated LXC roots are on `local-lvm`. IAM 206 remained
+  running and VMID 209 is absent.
+- Golden 9000 and Golden 9001 were not destroyed, replaced or modified.
+- `terraform fmt -check -recursive`: passed.
+- `terraform validate`: passed.
+- `terraform test`: 5 passed, 0 failed.
+- Offline LXC placement tests: 7 passed.
+- Final `terraform plan -parallelism=5`: `No changes. Your infrastructure
+  matches the configuration.`
+
 ## v2.2.0
 
 Release: `v2.2.0`.

@@ -1,6 +1,6 @@
 # HoRus-Bootstrap backlog
 
-The four-node Terraform bootstrap, 29-workload inventory (23 LXC and 6 VM), Golden 9000/9001
+The four-node Terraform bootstrap, 28-workload inventory (22 LXC and 6 VM), Golden 9000/9001
 model, provider-native VM lifecycle, two-phase LXC placement and idempotent
 steady state are complete.
 
@@ -11,6 +11,10 @@ inventory, placement and logical storage ownership model.
 Vikunja infrastructure is represented by the dedicated `horus-vkj-srv01`
 LXC on Node03. Guest application installation and DB03 integration remain an
 HoRus-Basis/Ansible responsibility.
+
+The duplicate dedicated Ansible container is retired. HoRus-Basis should
+install and maintain Ansible control tooling on the existing
+`horus-agent-srv01` Jenkins agent; Bootstrap does not provision guest packages.
 
 ## Future work
 
@@ -25,6 +29,8 @@ HoRus-Basis/Ansible responsibility.
   users, data ownership and guest-level NFS mounts derived from Terraform
   metadata, including GitGuardian CLI/ggshield, TruffleHog, Trivy, schedules,
   credentials and CI integration on `horus-gg-srv01`.
+- [ ] Configure the existing `horus-agent-srv01` Jenkins agent as the Ansible
+  control host in HoRus-Basis; do not restore a dedicated Bootstrap workload.
 - [ ] Evaluate Argo CD for future Kubernetes GitOps after the Kubernetes layer
   is ready. Argo CD must not manage Proxmox VM/LXC lifecycle.
 - [ ] Review long-term `local-lvm` capacity for the accepted thin-provisioning

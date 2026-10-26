@@ -11,15 +11,15 @@ metadata, workloads and storage consumers exactly once. `main.tf` derives
 `for_each` VM and LXC module instances; scripts do not contain a second workload
 inventory.
 
-The target cluster contains 29 managed workloads: 23 LXC and 6 VM.
+The target cluster contains 28 managed workloads: 22 LXC and 6 VM.
 
 | Final node | VMID range | LXC | VM | Total |
 |---|---:|---:|---:|---:|
 | `horus-pmx-node01` | 101-108 | 5 | 3 | 8 |
-| `horus-pmx-node02` | 201-209 | 7 | 2 | 9 |
+| `horus-pmx-node02` | 201-208 | 6 | 2 | 8 |
 | `horus-pmx-node03` | 301-306 | 5 | 1 | 6 |
 | `horus-pmx-node04` | 401-406 | 6 | 0 | 6 |
-| **Total** |  | **23** | **6** | **29** |
+| **Total** |  | **22** | **6** | **28** |
 
 VMID 307 is reserved. Golden VMIDs 9000 and 9001 are external prerequisites
 and remain outside Terraform state.
@@ -40,6 +40,13 @@ schedules, credentials and CI integration.
 VMID 306 is `horus-vkj-srv01`, a dedicated Vikunja LXC on Node03/VLAN 101.
 Terraform owns its infrastructure lifecycle and private `infra-data` mount;
 HoRus-Basis/Ansible owns the application and its DB03 PostgreSQL integration.
+
+The redundant dedicated `horus-ans-srv01` container is retired. Ansible
+control tooling belongs on the existing `horus-agent-srv01` Jenkins agent and
+remains a HoRus-Basis guest-configuration concern. Node02 is compacted to
+VMIDs 201-208: AI 201, AI PostgreSQL 202, vector database 203, AI cache 204,
+Joyfilm 205, unchanged IAM 206, Kubernetes worker 207 and control plane 208.
+VMID 209 is free; IAM was deliberately not renumbered or recreated.
 
 ## Ownership boundaries
 
@@ -151,7 +158,8 @@ final plans or perpetual helper replacement. Provider state ignores only the
 three externally completed runtime/rootfs fields, while the helper validates
 their actual final state.
 
-After the v2.2.0 Vikunja rollout, the normal read/refresh path was verified with:
+After the v2.2.1 Node02 numbering correction, the normal read/refresh path was
+verified with:
 
 ```text
 terraform plan -parallelism=5

@@ -1,7 +1,7 @@
 # HoRus resource and capacity plan
 
-Authoritative topology: 29 workloads, 23 LXC and 6 VM. Node totals are
-8 / 9 / 6 / 6. LXC roots must be at
+Authoritative topology: 28 workloads, 22 LXC and 6 VM. Node totals are
+8 / 8 / 6 / 6. LXC roots must be at
 least the Golden 9001 baseline of 8 GiB; VM roots must be at least the Golden
 9000 baseline of 12 GiB. Grafana VMID 401 remains valid at 10 GiB.
 
@@ -13,7 +13,7 @@ filled roots exceed physical capacity on all four nodes.
 | Node | Physical local-lvm GiB | Workload roots GiB | External Golden GiB | Accounted logical GiB | Ratio |
 |---|---:|---:|---:|---:|---:|
 | Node01 | 130.27 | 140 | 0 | 140 | 1.07x |
-| Node02 | 49.34 | 136 | 0 | 136 | 2.76x |
+| Node02 | 49.34 | 124 | 0 | 124 | 2.51x |
 | Node03 | 53.93 | 84 | 12 (VM 9000) | 96 | 1.78x |
 | Node04 | 53.93 | 78 | 0 | 78 | 1.45x |
 
@@ -22,6 +22,12 @@ workloads allocate 20 vCPU and 26 GiB RAM. The configuration reports this
 thin-provisioning risk and does not resize
 approved workloads to hide it. No root has been moved to `storage-infra` as a
 capacity workaround; any such change requires explicit approval.
+
+Node02 allocates 23 vCPU, 24 GiB RAM and 124 GiB of logical workload roots on
+49.34 GiB of physical `local-lvm` (approximately 2.51x thin provisioning).
+Removing the duplicate Ansible container released 2 vCPU, 2 GiB RAM and a
+12 GiB root. Ansible control tooling is assigned to the existing Node01
+Jenkins agent and does not require another infrastructure workload.
 
 Node03 allocates 10 vCPU and 9.25 GiB RAM after adding the dedicated Vikunja
 LXC. Its 12 GiB root raises workload roots from 72 to 84 GiB; with external

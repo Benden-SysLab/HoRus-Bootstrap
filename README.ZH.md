@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 用于重建后的四节点 HoRus Proxmox VE 集群的 Terraform bootstrap。本仓库管理
-29 个工作负载：23 个非特权 LXC 容器和 6 台虚拟机。
+28 个工作负载：22 个非特权 LXC 容器和 6 台虚拟机。
 
 完整参考：[README.md](README.md)。详细架构：[ARCHITECTURE.md](ARCHITECTURE.md)。
 权威拓扑：[`topology.tf`](topology.tf)。
@@ -10,15 +10,19 @@
 
 ## 状态
 
-当前 desired state 已部署并达到收敛状态。DB03 storage 恢复后的
-`terraform plan -parallelism=5` 返回：
+当前 desired state 已部署并达到收敛状态。删除重复的 Ansible 主机并修正
+Node02 VMID 后，`terraform plan -parallelism=5` 返回：
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-受控 apply 仅替换了空的 DB03 LXC 及其 placement helper；VM 302 和所有其他
-workloads 均未更改。Provider 固定为 `bpg/proxmox 0.115.0`。
+v2.2.1 rollout 删除了 `horus-ans-srv01`，仅重建 VMID 发生变化的已批准
+Node02 workloads。IAM 保持 VMID 206 并持续运行；Golden 9000/9001 未更改。
+Provider 为 `bpg/proxmox 0.115.0`。
+
+Ansible control tooling 将由 HoRus-Basis 配置在现有 Jenkins agent
+`horus-agent-srv01` 上。
 
 ## 架构
 
@@ -42,7 +46,7 @@ service。开发与 CAD 保留在 operator 的个人 laptop 上。
 | 节点 | Management | 硬件 | 主要角色 |
 |---|---|---|---|
 | `horus-pmx-node01` | `private` | Xeon E3-1275v2，约 31 GiB RAM | Guardian/security、CI、负载均衡、media、Kubernetes worker |
-| `horus-pmx-node02` | `private` | Xeon E3-1275v2，约 31 GiB RAM，RTX 3060 12 GB | Mimir AI、Ansible、Authentik、Joyfilm、Kubernetes |
+| `horus-pmx-node02` | `private` | Xeon E3-1275v2，约 31 GiB RAM，RTX 3060 12 GB | Mimir AI、Authentik、Joyfilm、Kubernetes |
 | `horus-pmx-node03` | `private` | i7-3770K，约 15.6 GiB RAM | storage、Golden factory、核心基础设施 |
 | `horus-pmx-node04` | `private` | i5-4210U，约 15.5 GiB RAM | observability、System Guardian |
 
@@ -70,10 +74,10 @@ Kubernetes：Pod CIDR `private`，Service CIDR `private`。
 | 节点 | LXC | VM | 总数 |
 |---|---|---|---:|
 | Node01 | 101 `horus-lb-srv01`、102 `horus-agent-srv01`、104 `horus-ai-srv01`、105 `horus-db-srv01`、108 `horus-gg-srv01` | 103 `horus-jnk-srv01`、106 `horus-media-srv01`、107 `horus-k8sw-srv01` | 8 |
-| Node02 | 201 `horus-ans-srv01`、202 `horus-ai-srv02`、203 `horus-db-srv02`、204 `horus-vec-srv01`、205 `horus-cache-srv01`、206 `horus-iam-srv01`、207 `horus-media-srv02` | 208 `horus-k8sw-srv02`、209 `horus-k8sc-srv01` | 9 |
+| Node02 | 201 `horus-ai-srv02`、202 `horus-db-srv02`、203 `horus-vec-srv01`、204 `horus-cache-srv01`、205 `horus-media-srv02`、206 `horus-iam-srv01` | 207 `horus-k8sw-srv02`、208 `horus-k8sc-srv01` | 8 |
 | Node03 | 301 `horus-db-srv03`、303 `horus-wiki-srv01`、304 `horus-git-srv01`、305 `horus-reg-srv01`、306 `horus-vkj-srv01` | 302 `horus-vlt-srv01` | 6 |
 | Node04 | 401 `horus-grf-srv01`、402 `horus-pm-srv01`、403 `horus-lok-srv01`、404 `horus-otel-srv01`、405 `horus-s3-srv01`、406 `horus-ai-srv03` | — | 6 |
-| **总计** | **23 LXC** | **6 VM** | **29** |
+| **总计** | **22 LXC** | **6 VM** | **28** |
 
 VMID 307 已保留，Terraform 不会创建它。Registry desired state 为
 `horus-reg-srv01`、VMID 305（原 306）、`horus-pmx-node03`、

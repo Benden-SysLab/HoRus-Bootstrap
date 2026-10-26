@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Terraform-bootstrap перебудованого чотиривузлового кластера HoRus Proxmox VE.
-Репозиторій керує 29 workloads: 23 непривілейованими LXC-контейнерами і
+Репозиторій керує 28 workloads: 22 непривілейованими LXC-контейнерами і
 6 віртуальними машинами.
 
 Повна довідка: [README.md](README.md). Детальна архітектура:
@@ -12,16 +12,20 @@ Environment-specific management/workload адреси, VLAN CIDR і gateway, NFS
 
 ## Стан
 
-Поточний desired state розгорнуто та приведено до збіжного стану. Після
-відновлення storage DB03 `terraform plan -parallelism=5` повернув:
+Поточний desired state розгорнуто та приведено до збіжного стану. Після видалення
+дублюючого Ansible-хоста і виправлення VMID Node02
+`terraform plan -parallelism=5` повернув:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Controlled apply замінив лише порожній LXC DB03 та його placement helper; VM
-302 та всі інші workloads не змінювалися. Зафіксована версія provider:
-`bpg/proxmox 0.115.0`.
+Rollout v2.2.1 видалив `horus-ans-srv01` і перестворив лише затверджені
+workloads Node02, VMID яких змінилися. IAM залишився VMID 206 і продовжив
+працювати; Golden 9000/9001 не змінювалися. Provider: `bpg/proxmox 0.115.0`.
+
+Ansible control tooling налаштовується HoRus-Basis на існуючому Jenkins agent
+`horus-agent-srv01`.
 
 ## Архітектура
 
@@ -46,7 +50,7 @@ Kubernetes GitOps; він не керує Proxmox VM/LXC і ще не розго
 | Вузол | Management | Обладнання | Роль |
 |---|---|---|---|
 | `horus-pmx-node01` | `private` | Xeon E3-1275v2, ~31 GiB RAM | Guardian/security, CI, балансування, media, Kubernetes worker |
-| `horus-pmx-node02` | `private` | Xeon E3-1275v2, ~31 GiB RAM, RTX 3060 12 GB | Mimir AI, Ansible, Authentik, Joyfilm, Kubernetes |
+| `horus-pmx-node02` | `private` | Xeon E3-1275v2, ~31 GiB RAM, RTX 3060 12 GB | Mimir AI, Authentik, Joyfilm, Kubernetes |
 | `horus-pmx-node03` | `private` | i7-3770K, ~15,6 GiB RAM | storage, Golden factory, основна інфраструктура |
 | `horus-pmx-node04` | `private` | i5-4210U, ~15,5 GiB RAM | observability, System Guardian |
 
@@ -74,10 +78,10 @@ Kubernetes: Pod CIDR `private`, Service CIDR `private`.
 | Вузол | LXC | VM | Разом |
 |---|---|---|---:|
 | Node01 | 101 `horus-lb-srv01`, 102 `horus-agent-srv01`, 104 `horus-ai-srv01`, 105 `horus-db-srv01`, 108 `horus-gg-srv01` | 103 `horus-jnk-srv01`, 106 `horus-media-srv01`, 107 `horus-k8sw-srv01` | 8 |
-| Node02 | 201 `horus-ans-srv01`, 202 `horus-ai-srv02`, 203 `horus-db-srv02`, 204 `horus-vec-srv01`, 205 `horus-cache-srv01`, 206 `horus-iam-srv01`, 207 `horus-media-srv02` | 208 `horus-k8sw-srv02`, 209 `horus-k8sc-srv01` | 9 |
+| Node02 | 201 `horus-ai-srv02`, 202 `horus-db-srv02`, 203 `horus-vec-srv01`, 204 `horus-cache-srv01`, 205 `horus-media-srv02`, 206 `horus-iam-srv01` | 207 `horus-k8sw-srv02`, 208 `horus-k8sc-srv01` | 8 |
 | Node03 | 301 `horus-db-srv03`, 303 `horus-wiki-srv01`, 304 `horus-git-srv01`, 305 `horus-reg-srv01`, 306 `horus-vkj-srv01` | 302 `horus-vlt-srv01` | 6 |
 | Node04 | 401 `horus-grf-srv01`, 402 `horus-pm-srv01`, 403 `horus-lok-srv01`, 404 `horus-otel-srv01`, 405 `horus-s3-srv01`, 406 `horus-ai-srv03` | — | 6 |
-| **Разом** | **23 LXC** | **6 VM** | **29** |
+| **Разом** | **22 LXC** | **6 VM** | **28** |
 
 VMID 307 зарезервовано; Terraform його не створює. Registry визначено як
 `horus-reg-srv01`, VMID 305 (раніше 306), на `horus-pmx-node03`, з

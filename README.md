@@ -1,7 +1,7 @@
 # HoRus-Bootstrap
 
 Terraform bootstrap for the rebuilt four-node HoRus Proxmox VE cluster. The
-repository manages 29 workloads—23 unprivileged LXC containers and 6 virtual
+repository manages 28 workloads—22 unprivileged LXC containers and 6 virtual
 machines—together with their placement, compute, network and private storage
 attachments.
 
@@ -10,16 +10,21 @@ Russian documentation: [README.RU.md](README.RU.md). Detailed design:
 
 ## Status
 
-The current desired topology is deployed and converged. After creating the
-Vikunja LXC, `terraform plan -parallelism=5` returned:
+The current desired topology is deployed and converged. After removing the
+duplicate dedicated Ansible host and compacting Node02 VMIDs,
+`terraform plan -parallelism=5` returned:
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-The v2.2.0 apply created only CT 306 and its placement helper (`2 added,
-0 changed, 0 destroyed`). All existing workloads and Golden 9000/9001 were
-unchanged. The provider is pinned to `bpg/proxmox 0.115.0`.
+The v2.2.1 rollout removed `horus-ans-srv01` and recreated only the approved
+Node02 workloads whose VMIDs changed. IAM remained running as VMID 206;
+Golden 9000/9001 were unchanged. The provider is pinned to
+`bpg/proxmox 0.115.0`.
+
+Ansible control tooling is assigned to the existing `horus-agent-srv01`
+Jenkins agent; HoRus-Basis owns that guest configuration.
 
 ## Architecture overview
 
@@ -47,7 +52,7 @@ personal laptop.
 | Node | CPU | RAM | Primary role |
 |---|---|---:|---|
 | `horus-pmx-node01` | Xeon E3-1275v2 | ~31 GiB | Guardian/security, CI, load balancing, CasaOS/media, Kubernetes worker |
-| `horus-pmx-node02` | Xeon E3-1275v2, RTX 3060 12 GB | ~31 GiB | Mimir AI, Ansible, Authentik, Joyfilm, Kubernetes |
+| `horus-pmx-node02` | Xeon E3-1275v2, RTX 3060 12 GB | ~31 GiB | Mimir AI, Authentik, Joyfilm, Kubernetes |
 | `horus-pmx-node03` | i7-3770K | ~15.6 GiB | Storage, Golden factory, core infrastructure |
 | `horus-pmx-node04` | i5-4210U | ~15.5 GiB | Observability, System Guardian |
 
@@ -89,15 +94,14 @@ private network design rather than documented in this public repository.
 | Node01 | 106 | VM | `horus-media-srv01` | 101 |
 | Node01 | 107 | VM | `horus-k8sw-srv01` | 180 |
 | Node01 | 108 | LXC | `horus-gg-srv01` | 150 |
-| Node02 | 201 | LXC | `horus-ans-srv01` | 101 |
-| Node02 | 202 | LXC | `horus-ai-srv02` | 160 |
-| Node02 | 203 | LXC | `horus-db-srv02` | 160 |
-| Node02 | 204 | LXC | `horus-vec-srv01` | 160 |
-| Node02 | 205 | LXC | `horus-cache-srv01` | 160 |
+| Node02 | 201 | LXC | `horus-ai-srv02` | 160 |
+| Node02 | 202 | LXC | `horus-db-srv02` | 160 |
+| Node02 | 203 | LXC | `horus-vec-srv01` | 160 |
+| Node02 | 204 | LXC | `horus-cache-srv01` | 160 |
+| Node02 | 205 | LXC | `horus-media-srv02` | 101 |
 | Node02 | 206 | LXC | `horus-iam-srv01` | 101 |
-| Node02 | 207 | LXC | `horus-media-srv02` | 101 |
-| Node02 | 208 | VM | `horus-k8sw-srv02` | 180 |
-| Node02 | 209 | VM | `horus-k8sc-srv01` | 180 |
+| Node02 | 207 | VM | `horus-k8sw-srv02` | 180 |
+| Node02 | 208 | VM | `horus-k8sc-srv01` | 180 |
 | Node03 | 301 | LXC | `horus-db-srv03` | 101 |
 | Node03 | 302 | VM | `horus-vlt-srv01` | 101 |
 | Node03 | 303 | LXC | `horus-wiki-srv01` | 101 |

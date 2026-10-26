@@ -2,7 +2,7 @@
 
 再構築された4ノード構成の HoRus Proxmox VE クラスター向け Terraform
 ブートストラップです。このリポジトリは、22個の非特権 LXC コンテナーと
-6台の仮想マシン、合計29ワークロード（23 LXC）を管理します。
+6台の仮想マシン、合計28ワークロードを管理します。
 
 完全なリファレンス: [README.md](README.md)。詳細設計:
 [ARCHITECTURE.md](ARCHITECTURE.md)。正規のトポロジー:
@@ -12,16 +12,19 @@
 
 ## ステータス
 
-現在の desired state はデプロイ済みで収束しています。DB03 storage recovery
-後の `terraform plan -parallelism=5` の結果は次のとおりです。
+現在の desired state はデプロイ済みで収束しています。重複した Ansible
+ホストの削除と Node02 VMID の修正後、`terraform plan -parallelism=5` は次を返しました。
 
 ```text
 No changes. Your infrastructure matches the configuration.
 ```
 
-Controlled apply が置換したのは空の DB03 LXC と placement helper のみです。
-VM 302 とその他すべての workloads は変更されていません。Provider は
-`bpg/proxmox 0.115.0` に固定されています。
+v2.2.1 rollout は `horus-ans-srv01` を削除し、VMID が変更された承認済み
+Node02 workloads のみを再作成しました。IAM は VMID 206 で稼働を継続し、
+Golden 9000/9001 は変更されていません。Provider は `bpg/proxmox 0.115.0` です。
+
+Ansible control tooling は既存の Jenkins agent `horus-agent-srv01` に
+HoRus-Basis が設定します。
 
 ## アーキテクチャ
 
@@ -46,7 +49,7 @@ GitOps 専用で、Proxmox VM/LXC を管理せず、まだデプロイされて�
 | ノード | Management | ハードウェア | 主な役割 |
 |---|---|---|---|
 | `horus-pmx-node01` | `private` | Xeon E3-1275v2、約31 GiB RAM | Guardian/security、CI、負荷分散、media、Kubernetes worker |
-| `horus-pmx-node02` | `private` | Xeon E3-1275v2、約31 GiB RAM、RTX 3060 12 GB | Mimir AI、Ansible、Authentik、Joyfilm、Kubernetes |
+| `horus-pmx-node02` | `private` | Xeon E3-1275v2、約31 GiB RAM、RTX 3060 12 GB | Mimir AI、Authentik、Joyfilm、Kubernetes |
 | `horus-pmx-node03` | `private` | i7-3770K、約15.6 GiB RAM | storage、Golden factory、基盤サービス |
 | `horus-pmx-node04` | `private` | i5-4210U、約15.5 GiB RAM | observability、System Guardian |
 
@@ -74,10 +77,10 @@ Kubernetes: Pod CIDR `private`、Service CIDR `private`。
 | ノード | LXC | VM | 合計 |
 |---|---|---|---:|
 | Node01 | 101 `horus-lb-srv01`、102 `horus-agent-srv01`、104 `horus-ai-srv01`、105 `horus-db-srv01`、108 `horus-gg-srv01` | 103 `horus-jnk-srv01`、106 `horus-media-srv01`、107 `horus-k8sw-srv01` | 8 |
-| Node02 | 201 `horus-ans-srv01`、202 `horus-ai-srv02`、203 `horus-db-srv02`、204 `horus-vec-srv01`、205 `horus-cache-srv01`、206 `horus-iam-srv01`、207 `horus-media-srv02` | 208 `horus-k8sw-srv02`、209 `horus-k8sc-srv01` | 9 |
+| Node02 | 201 `horus-ai-srv02`、202 `horus-db-srv02`、203 `horus-vec-srv01`、204 `horus-cache-srv01`、205 `horus-media-srv02`、206 `horus-iam-srv01` | 207 `horus-k8sw-srv02`、208 `horus-k8sc-srv01` | 8 |
 | Node03 | 301 `horus-db-srv03`、303 `horus-wiki-srv01`、304 `horus-git-srv01`、305 `horus-reg-srv01`、306 `horus-vkj-srv01` | 302 `horus-vlt-srv01` | 6 |
 | Node04 | 401 `horus-grf-srv01`、402 `horus-pm-srv01`、403 `horus-lok-srv01`、404 `horus-otel-srv01`、405 `horus-s3-srv01`、406 `horus-ai-srv03` | — | 6 |
-| **合計** | **23 LXC** | **6 VM** | **29** |
+| **合計** | **22 LXC** | **6 VM** | **28** |
 
 VMID 307 は予約済みで、Terraform は作成しません。Registry の desired
 state は `horus-reg-srv01`、VMID 305（旧 306）、`horus-pmx-node03`、
