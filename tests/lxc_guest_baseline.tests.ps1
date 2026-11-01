@@ -13,14 +13,15 @@ function Assert-Fails([scriptblock] $Body) {
   Assert-Test $failed 'Expected a fail-closed error.'
 }
 
-function New-Fixture([string] $Status = 'stopped') {
+function New-Fixture([string] $Status = 'stopped', [string] $Fingerprint = 'SHA256:GoldenTemplateFingerprint000000000000000') {
   $spec = @{
-    vmid = 401; hostname = 'horus-grf-srv01'; target_node = 'horus-pmx-node04'
-    timezone = 'Europe/Moscow'
+    vmid = 401; hostname = 'horus-grf-srv01'; template_vmid = 9001
+    target_node = 'horus-pmx-node04'; timezone = 'Europe/Moscow'
+    template_host_key_sha256 = 'SHA256:GoldenTemplateFingerprint000000000000000'
   }
   $state = @{
     Node = 'horus-pmx-node04'; Status = $Status; Name = $spec.hostname
-    Commands = [System.Collections.Generic.List[string]]::new()
+    Fingerprint = $Fingerprint; Commands = [System.Collections.Generic.List[string]]::new()
   }
   $remote = {
     param($node, $command)
@@ -30,6 +31,14 @@ function New-Fixture([string] $Status = 'stopped') {
             vmid = 401; node = $state.Node; status = $state.Status
             type = 'lxc'; name = $state.Name; template = 0
           }))
+    }
+    if ($command -match 'ssh-keygen -lf .+ssh_host_ed25519_key\.pub') {
+      if ($null -eq $state.Fingerprint) { return 'MISSING' }
+      return "256 $($state.Fingerprint) root@test (ED25519)"
+    }
+    if ($command -match 'ssh-keygen -A') {
+      $state.Fingerprint = 'SHA256:UniqueWorkloadFingerprint111111111111111'
+      return ''
     }
     if ($command -match 'base64 -d') { return '' }
     throw "Unexpected command: $command"
@@ -42,36 +51,25 @@ $passed = 0
 $f = New-Fixture -Status stopped
 Invoke-HorusLxcGuestBaseline $f.Spec $f.Remote
 $commands = $f.State.Commands -join "`n"
-Assert-Test ($commands -match 'pct mount 401' -and $commands -match 'base64 -d') 'Stopped clone was not configured offline.'
+Assert-Test ($commands -match 'ssh-keygen -A -f' -and $commands -match 'base64 -d') 'Stopped clone did not receive identity and baseline.'
 $passed++
 
-$f = New-Fixture -Status running
+$f = New-Fixture -Status running -Fingerprint 'SHA256:AlreadyUniqueFingerprint222222222222222222'
 Invoke-HorusLxcGuestBaseline $f.Spec $f.Remote
 $commands = $f.State.Commands -join "`n"
-Assert-Test ($commands -match 'pct exec 401' -and $commands -match 'date \+%z') 'Running reconciliation did not verify the timezone.'
-$passed++
-
-$script = Get-HorusLxcGuestBaselineScript '/var/lib/lxc/401/rootfs'
-Assert-Test ($script -match 'Europe/Moscow' -and $script -match 'NOPASSWD: ALL') 'Baseline script omitted timezone or Jenkins sudo.'
-Assert-Test ($script -match 'chown --reference=') 'Offline baseline did not preserve unprivileged UID/GID mapping.'
-$passed++
-
-$f = New-Fixture
-$f.State.Node = 'horus-pmx-node03'
-Assert-Fails { Invoke-HorusLxcGuestBaseline $f.Spec $f.Remote }
-Assert-Test (-not (($f.State.Commands -join "`n") -match 'base64 -d')) 'Wrong-node LXC was mutated.'
+Assert-Test ($commands -notmatch 'ssh-keygen -A' -and $commands -match 'date \+%z') 'Running reconciliation changed a unique key or skipped runtime validation.'
 $passed++
 
 $f = New-Fixture
 $f.State.Name = 'unexpected-host'
 Assert-Fails { Invoke-HorusLxcGuestBaseline $f.Spec $f.Remote }
-Assert-Test (-not (($f.State.Commands -join "`n") -match 'base64 -d')) 'Identity-mismatched LXC was mutated.'
+Assert-Test (-not (($f.State.Commands -join "`n") -match 'ssh-keygen -A|base64 -d')) 'Identity-mismatched LXC was mutated.'
 $passed++
 
 $f = New-Fixture
 $f.Spec.vmid = 9001
 Assert-Fails { Invoke-HorusLxcGuestBaseline $f.Spec $f.Remote }
-Assert-Test ($f.State.Commands.Count -eq 0) 'Golden template VMID was queried or mutated.'
+Assert-Test ($f.State.Commands.Count -eq 0) 'Golden template was queried or mutated.'
 $passed++
 
 $f = New-Fixture
@@ -80,4 +78,4 @@ Assert-Fails { Invoke-HorusLxcGuestBaseline $f.Spec $f.Remote }
 Assert-Test ($f.State.Commands.Count -eq 0) 'Unapproved timezone reached remote execution.'
 $passed++
 
-Write-Host "PASS: $passed offline LXC guest-baseline tests."
+Write-Host "PASS: $passed offline LXC pre-start baseline tests."

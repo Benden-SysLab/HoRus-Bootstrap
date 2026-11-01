@@ -14,7 +14,7 @@ function New-Fixture {
     bridge = 'vmbr0'; vlan_id = 150; ip_address = '198.51.100.88/28'; gateway = '198.51.100.81'
     private_mounts = @(@{ datastore_id = 'logs-data'; path = '/data/example/logs'; size = '0' })
     features = @{ nesting = $true; keyctl = $true; fuse = $true; mknod = $false; mount = @('nfs', 'cifs') }
-    allow_shutdown = $false; start_on_boot = $true
+    allow_shutdown = $false; started = $true; start_on_boot = $true
   }
   $state = @{
     Node = 'horus-pmx-node04'; Status = 'stopped'; Name = $spec.hostname
@@ -81,6 +81,13 @@ $f = New-Fixture
 $f.State.Config.rootfs = 'local-lvm:vm-405-disk-0,size=8G'
 Invoke-HorusLxcPlacement $f.Spec $f.Remote $f.Sleep
 Assert-Test (($f.State.Commands -match 'pct resize').Count -eq 1 -and $f.State.Status -eq 'running') 'Safe upward resize/start did not complete.'
+$passed++
+
+$f = New-Fixture
+$f.State.Status = 'running'
+$f.State.Config.rootfs = 'storage-infra:vm-405-disk-0,size=8G'
+Invoke-HorusLxcPlacement $f.Spec $f.Remote $f.Sleep
+Assert-Test (($f.State.Commands -match 'pct shutdown').Count -eq 1 -and $f.State.Status -eq 'running' -and $f.State.Config.rootfs -match '^local-lvm:.*size=16G') 'Interrupted bootstrap was not resumed safely after onboot start.'
 $passed++
 
 $f = New-Fixture

@@ -20,9 +20,11 @@ resource "proxmox_virtual_environment_container" "lxc_node" {
   # Proxmox permits this cross-node clone only to shared storage. The CT is
   # cloned directly on its final node; the completion barrier then moves only
   # rootfs from storage-infra to that node's local-lvm and starts the CT.
-  node_name     = var.target_node
-  vm_id         = var.vmid
-  unprivileged  = true
+  node_name    = var.target_node
+  vm_id        = var.vmid
+  unprivileged = true
+  # Creation must stay stopped until rootfs is moved to local-lvm. The
+  # placement contract explicitly owns the final started=true transition.
   started       = false
   start_on_boot = true
 

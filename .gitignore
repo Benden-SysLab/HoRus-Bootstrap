@@ -4,6 +4,8 @@ terraform.tfvars
 .terraform/
 .ssh/
 root_password.txt
+.json/
+.json.rar
 
 *.tfplan
 *.tfplan.json

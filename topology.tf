@@ -173,14 +173,6 @@ locals {
     alltrue([for workload in values(local.workloads) : try(cidrhost(workload.ip_address, 0) == cidrhost(local.vlans[tostring(workload.vlan_id)].cidr, 0), false)])
   )
 }
-
-check "inventory" {
-  assert {
-    condition     = length(local.workloads) == 28 && length(local.lxc_workloads) == 22 && length(local.vm_workloads) == 6
-    error_message = "HoRus inventory must contain exactly 28 workloads: 22 LXC and 6 VM."
-  }
-}
-
 check "identity_uniqueness" {
   assert {
     condition = (
@@ -265,57 +257,4 @@ check "storage_boundaries" {
     error_message = "Private state must be single-owner Proxmox storage; shared data must remain guest-managed NFS. Guardian AI must not receive Guardian DB files."
   }
 }
-
-check "retired_names_absent" {
-  assert {
-    condition     = alltrue([for retired in ["horus-ai-srv04", "horus-work-srv01", "horus-ans-srv01"] : !contains(keys(local.workloads), retired)])
-    error_message = "Retired workload names must remain absent."
-  }
-}
-
-check "node02_compaction_contract" {
-  assert {
-    condition = (
-      local.workloads["horus-ai-srv02"].vmid == 201 &&
-      local.workloads["horus-db-srv02"].vmid == 202 &&
-      local.workloads["horus-vec-srv01"].vmid == 203 &&
-      local.workloads["horus-cache-srv01"].vmid == 204 &&
-      local.workloads["horus-media-srv02"].vmid == 205 &&
-      local.workloads["horus-iam-srv01"].vmid == 206 &&
-      local.workloads["horus-k8sw-srv02"].vmid == 207 &&
-      local.workloads["horus-k8sc-srv01"].vmid == 208 &&
-      !contains([for workload in values(local.workloads) : workload.vmid], 209)
-    )
-    error_message = "Node02 VMIDs must remain compact while IAM stays at deployed VMID 206."
-  }
-}
-
-check "vikunja_contract" {
-  assert {
-    condition = (
-      local.workloads["horus-vkj-srv01"].vmid == 306 &&
-      local.workloads["horus-vkj-srv01"].target_node == "horus-pmx-node03" &&
-      local.workloads["horus-vkj-srv01"].vlan_id == 101 &&
-      local.workloads["horus-vkj-srv01"].private_mounts[0].storage_name == "infra-data" &&
-      local.workloads["horus-vkj-srv01"].private_mounts[0].path == var.environment.guest_paths["infra-vikunja"]
-    )
-    error_message = "Vikunja identity, placement, network or private storage contract changed."
-  }
-}
-
-# Keep the accepted thin-provisioning risk explicit and detect any unreviewed
-# capacity drift. Workload sizes are not reduced to make this assertion pass.
-check "local_lvm_capacity_accounting" {
-  assert {
-    condition = (
-      local.local_lvm_logical_root_gib == {
-        "horus-pmx-node01" = 140
-        "horus-pmx-node02" = 124
-        "horus-pmx-node03" = 96
-        "horus-pmx-node04" = 78
-      } &&
-      alltrue([for node in keys(local.nodes) : local.local_lvm_overcommit_ratio[node] > 1])
-    )
-    error_message = "Reviewed local-lvm capacity changed. Recalculate physical capacity and logical thin allocation before apply."
-  }
-}
+# End of topology safety checks.

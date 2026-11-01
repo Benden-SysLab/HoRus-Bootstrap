@@ -2,17 +2,20 @@
 Set-StrictMode -Version Latest
 
 function Assert-HorusLxcGuestBaselineSpec([System.Collections.IDictionary] $Spec) {
-  foreach ($key in @('vmid', 'hostname', 'target_node', 'timezone')) {
+  foreach ($key in @('vmid', 'hostname', 'template_vmid', 'target_node', 'template_host_key_sha256', 'timezone')) {
     if (-not $Spec.Contains($key)) { throw "Missing guest-baseline field: $key" }
   }
-  if ([int]$Spec.vmid -lt 100 -or [int]$Spec.vmid -ge 9000) {
-    throw 'Only workload LXC VMIDs are supported.'
+  if ([int]$Spec.vmid -lt 100 -or [int]$Spec.vmid -ge 9000 -or [int]$Spec.template_vmid -ne 9001) {
+    throw 'Only workload clones of external Golden LXC 9001 are supported.'
   }
   if ($Spec.target_node -notmatch '^horus-pmx-node0[1-4]$' -or $Spec.hostname -notmatch '^[a-z0-9-]+$') {
     throw 'Unsafe LXC identity or target node.'
   }
   if ($Spec.timezone -ne 'Europe/Moscow') {
     throw 'The approved HoRus LXC timezone is Europe/Moscow.'
+  }
+  if ($Spec.template_host_key_sha256 -notmatch '^SHA256:[A-Za-z0-9+/=]+$') {
+    throw 'Golden LXC ED25519 fingerprint must use OpenSSH SHA256 format.'
   }
 }
 
@@ -66,11 +69,53 @@ test "`$(cat "`$root/etc/sudoers.d/jenkins-srv")" = 'jenkins-srv ALL=(ALL:ALL) N
 "@
 }
 
+function Get-HorusLxcSshFingerprintFromOutput([string] $Output) {
+  if ($Output -match '(?m)\b(SHA256:[A-Za-z0-9+/=]+)\b') { return $Matches[1] }
+  if ($Output -match '(?m)^MISSING\s*$') { return $null }
+  throw 'Unable to parse LXC ED25519 host-key fingerprint.'
+}
+
+function Get-HorusLxcSshFingerprint([object] $Context, [System.Collections.IDictionary] $Guest) {
+  $vmid = [int]$Context.Spec.vmid
+  if ($Guest.status -eq 'running') {
+    $command = "pct exec $vmid -- sh -c 'if test -f /etc/ssh/ssh_host_ed25519_key.pub; then ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256; else echo MISSING; fi'"
+  } else {
+    $root = "/var/lib/lxc/$vmid/rootfs"
+    $command = "sh -ceu 'pct mount $vmid >/dev/null; trap `"pct unmount $vmid >/dev/null 2>&1 || true`" EXIT; if test -f $root/etc/ssh/ssh_host_ed25519_key.pub; then ssh-keygen -lf $root/etc/ssh/ssh_host_ed25519_key.pub -E sha256; else echo MISSING; fi'"
+  }
+  $raw = Invoke-HorusLxcGuestBaselineCommand $Context $Guest.node $command
+  return Get-HorusLxcSshFingerprintFromOutput ([string]$raw)
+}
+
+function Invoke-HorusLxcSshKeyRotation([object] $Context, [System.Collections.IDictionary] $Guest) {
+  $vmid = [int]$Context.Spec.vmid
+  if ($Guest.status -eq 'running') {
+    $command = "pct exec $vmid -- sh -ceu 'backup=`$(mktemp -d /root/.horus-ssh-host-keys.XXXXXX); cp -a /etc/ssh/ssh_host_* `"`$backup/`" 2>/dev/null || true; rm -f /etc/ssh/ssh_host_*; if ! ssh-keygen -A || ! sshd -t || ! systemctl restart ssh; then rm -f /etc/ssh/ssh_host_*; cp -a `"`$backup/`"ssh_host_* /etc/ssh/ 2>/dev/null || true; systemctl restart ssh || true; exit 1; fi; rm -rf `"`$backup`"'"
+  } else {
+    $root = "/var/lib/lxc/$vmid/rootfs"
+    $command = "sh -ceu 'pct mount $vmid >/dev/null; trap `"pct unmount $vmid >/dev/null 2>&1 || true`" EXIT; root=$root; backup=`$(mktemp -d `"`$root/root/.horus-ssh-host-keys.XXXXXX`" ); cp -a `"`$root/etc/ssh/`"ssh_host_* `"`$backup/`" 2>/dev/null || true; rm -f `"`$root/etc/ssh/`"ssh_host_*; if ! ssh-keygen -A -f `"`$root`"; then rm -f `"`$root/etc/ssh/`"ssh_host_*; cp -a `"`$backup/`"ssh_host_* `"`$root/etc/ssh/`" 2>/dev/null || true; exit 1; fi; rm -rf `"`$backup`"'"
+  }
+  $null = Invoke-HorusLxcGuestBaselineCommand $Context $Guest.node $command
+}
+
 function Invoke-HorusLxcGuestBaseline([System.Collections.IDictionary] $Spec, [scriptblock] $Remote) {
   Assert-HorusLxcGuestBaselineSpec $Spec
   $context = [pscustomobject]@{ Spec = $Spec; Remote = $Remote }
   $guest = Get-HorusLxcGuestBaselineGuest $context
   $vmid = [int]$Spec.vmid
+
+  $before = Get-HorusLxcSshFingerprint $context $guest
+  $needsRotation = $guest.status -eq 'stopped' -or $null -eq $before -or $before -eq $Spec.template_host_key_sha256
+  if ($needsRotation) {
+    Invoke-HorusLxcSshKeyRotation $context $guest
+  }
+  $after = Get-HorusLxcSshFingerprint $context $guest
+  if ($null -eq $after -or $after -eq $Spec.template_host_key_sha256) {
+    throw 'LXC still has a missing or Golden-template ED25519 host key.'
+  }
+  if ($needsRotation -and $null -ne $before -and $after -eq $before) {
+    throw 'LXC ED25519 host key did not change during required rotation.'
+  }
 
   if ($guest.status -eq 'running') {
     $script = Get-HorusLxcGuestBaselineScript
@@ -84,5 +129,5 @@ function Invoke-HorusLxcGuestBaseline([System.Collections.IDictionary] $Spec, [s
   }
 
   $null = Invoke-HorusLxcGuestBaselineCommand $context $guest.node $command
-  Write-Host "Verified guest baseline: $($Spec.hostname) ($vmid), Europe/Moscow, Jenkins sudo."
+  Write-Host "Verified pre-start baseline: $($Spec.hostname) ($vmid), unique SSH identity, Europe/Moscow, Jenkins sudo."
 }

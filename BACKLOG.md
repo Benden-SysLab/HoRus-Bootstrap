@@ -38,10 +38,10 @@ install and maintain Ansible control tooling on the existing
   1.07x (140 GiB logical on 130.27 GiB physical); do not reduce approved workload sizes
   silently.
 - [ ] Add CI execution for formatting, validation, Terraform tests and offline
-  placement/SSH-identity tests when a suitable secret-free runner workflow is
+  placement/pre-start baseline tests when a suitable secret-free runner workflow is
   approved.
 - [ ] Sanitize Golden 9001 itself by removing generated SSH host keys before
-  sealing a future template revision. Keep the Terraform identity barrier even
+  sealing a future template revision. Keep the Terraform pre-start identity check even
   after template hygiene is corrected, as a deployment-time safety control.
 - [ ] Evaluate the equivalent unique-host-key guarantee for Golden VM 9000.
   Do not add an ad-hoc VM helper until the provider/Cloud-Init boundary is

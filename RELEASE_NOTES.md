@@ -1,5 +1,51 @@
 # HoRus-Bootstrap release notes
 
+## v2.2.3
+
+Release: `v2.2.3`.
+
+### Simplified LXC bootstrap lifecycle
+
+- Consolidated the separate SSH-identity and guest-baseline barriers into one
+  pre-start baseline for unique SSH host keys, `Europe/Moscow` timezone and the
+  passwordless `jenkins-srv` deployment sudo policy.
+- Preserved Terraform state identity with a `moved` block; removed the obsolete
+  duplicate identity helper and its standalone tests.
+- Made the final LXC contract explicit: `started=true` and
+  `start_on_boot=true`. Containers are still cloned stopped so rootfs placement
+  can complete safely before the final start.
+- Added recovery for an interrupted bootstrap: if Proxmox `onboot` starts a CT
+  while its rootfs is still on approved shared `storage-infra`, placement
+  performs a controlled shutdown, moves rootfs to the target node's
+  `local-lvm`, grows it without shrinking, verifies configuration and starts
+  the CT again. Unexpected storage remains a hard failure.
+
+### Repository and validation cleanup
+
+- Removed redundant count/order/capacity assertions and historical one-off
+  topology checks while retaining identity, Golden disk baseline, placement,
+  network, memory and storage ownership boundaries.
+- Removed dead proxy scripts, obsolete journald override, duplicate SSH helper
+  tests, editor-only settings and temporary archive/notes files.
+- Updated English and Russian documentation, architecture and backlog to match
+  the simplified lifecycle and current ownership boundaries.
+
+### Golden images and rollout
+
+- Hardened external Golden VM 9000 with the approved `jenkins-srv` identity,
+  SSH key and passwordless sudo, then cleared machine identity, Cloud-Init state
+  and SSH host keys before returning it to template state.
+- Recreated the empty workload pool from Golden 9000/9001. Golden templates
+  themselves remained external and were not destroyed by Terraform.
+- Removed four stale detached Node03 bootstrap volumes before recreation.
+- Recovered stale `lock: mounted` on CT 102 after a Proxmox node restart and
+  completed placement for all 22 LXC workloads.
+- `terraform validate`: passed.
+- `terraform test`: 5 passed, 0 failed.
+- Offline LXC placement tests: 8 passed.
+- Final `terraform plan -parallelism=5`: `No changes. Your infrastructure
+  matches the configuration.`
+
 ## v2.2.2
 
 Release: `v2.2.2`.

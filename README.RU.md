@@ -178,8 +178,7 @@ lifecycle:
 Golden 9001 на Node03/storage-infra
   -> provider full clone
   -> финальная node/storage-infra, stopped
-  -> SSH identity barrier: замена унаследованных Golden host keys
-  -> guest baseline barrier: Europe/Moscow и Jenkins deployment sudo
+  -> pre-start baseline: уникальные SSH keys, Europe/Moscow и Jenkins sudo
   -> same-node placement helper
   -> pct move-volume rootfs в local-lvm
   -> grow rootfs только при необходимости
@@ -188,19 +187,10 @@ Golden 9001 на Node03/storage-infra
   -> running с onboot=1
 ```
 
-SSH identity barrier выполняется до первого запуска. Для каждого stopped clone
-он генерирует новые host keys, а у уже работающего workload меняет ключ только
-если ED25519 отсутствует или совпадает с зафиксированным fingerprint Golden
-9001. При несовпадении VMID, hostname, типа или target node процесс завершается
-без изменений. Так существующие LXC исправляются без пересоздания, а новые не
-могут запуститься с общей SSH identity шаблона.
-
-Guest baseline barrier выполняется после SSH identity и до placement. В
-`bpg/proxmox 0.115.0` нет поля LXC timezone, поэтому barrier записывает и
-проверяет `Europe/Moscow`, пока clone ещё остановлен. Он также устанавливает
-утверждённый Jenkins sudoers с сохранением UID/GID mapping unprivileged LXC.
-Текущие running workloads этим release не изменяются: baseline применяется
-при их пересоздании.
+Один pre-start barrier до placement заменяет унаследованные host keys,
+устанавливает `Europe/Moscow` и Jenkins sudoers. Уже уникальные ключи
+сохраняются. При несовпадении VMID, hostname, типа или target node процесс
+завершается без изменений; UID/GID mapping unprivileged LXC сохраняется.
 
 Placement helper не выполняет межнодовую миграцию контейнеров. Он идемпотентен, никогда
 не уменьшает диски и жёстко останавливается при неожиданном identity, node,
@@ -328,12 +318,11 @@ terraform fmt -check -recursive
 terraform validate
 terraform test
 pwsh -NoProfile -File tests/lxc_placement.tests.ps1
-pwsh -NoProfile -File tests/lxc_ssh_identity.tests.ps1
 pwsh -NoProfile -File tests/lxc_guest_baseline.tests.ps1
 ```
 
-Текущий результат: 5 Terraform tests passed, 0 failed; 7 offline placement
-tests, 7 offline SSH-identity tests и 7 offline guest-baseline tests passed.
+Фокусные PowerShell suites покрывают placement и объединённый pre-start
+baseline для SSH identity, timezone и sudo.
 
 ## Известные ограничения
 
@@ -352,7 +341,7 @@ tests, 7 offline SSH-identity tests и 7 offline guest-baseline tests passed.
 | `topology.tf` | авторитетные nodes, VLANs, workloads и storage consumers |
 | `main.tf` | storage resources и динамические VM/LXC module calls |
 | `modules/proxmox_vm/` | provider-native VM lifecycle |
-| `modules/proxmox_lxc/` | provider-owned LXC и placement barrier |
+| `modules/proxmox_lxc/` | provider-owned LXC, pre-start baseline и placement barrier |
 | `scripts/lxc_placement.ps1` | минимальная Terraform entry point для LXC placement |
 | `scripts/lib/Horus.LxcPlacement.ps1` | fail-closed placement implementation |
 | `tests/` | inventory, module и offline helper tests |

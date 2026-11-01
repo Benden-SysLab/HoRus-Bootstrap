@@ -2,12 +2,13 @@
 Set-StrictMode -Version Latest
 
 function Assert-HorusPlacementSpec([System.Collections.IDictionary] $Spec) {
-  foreach ($key in @('vmid', 'hostname', 'template_vmid', 'target_node', 'root_storage', 'disk_size', 'bridge', 'vlan_id', 'ip_address', 'gateway', 'private_mounts', 'features', 'allow_shutdown', 'start_on_boot')) {
+  foreach ($key in @('vmid', 'hostname', 'template_vmid', 'target_node', 'root_storage', 'disk_size', 'bridge', 'vlan_id', 'ip_address', 'gateway', 'private_mounts', 'features', 'allow_shutdown', 'started', 'start_on_boot')) {
     if (-not $Spec.Contains($key)) { throw "Missing placement field: $key" }
   }
   if ([int]$Spec.vmid -lt 100 -or [int]$Spec.vmid -ge 9000 -or [int]$Spec.template_vmid -ne 9001) { throw 'Only workload clones of external Golden LXC 9001 are supported.' }
   if ($Spec.target_node -notmatch '^horus-pmx-node0[1-4]$' -or $Spec.hostname -notmatch '^[a-z0-9-]+$') { throw 'Unsafe identity or target node.' }
   if ($Spec.root_storage -ne 'local-lvm' -or [decimal]$Spec.disk_size -lt 8) { throw 'Final rootfs must be local-lvm and at least the 8 GiB Golden baseline.' }
+  if (-not $Spec.started -or -not $Spec.start_on_boot) { throw 'The approved final LXC state is running with start_on_boot=true.' }
   if ($Spec.bridge -notmatch '^[A-Za-z0-9_.-]+$' -or $Spec.ip_address -notmatch '^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$' -or $Spec.gateway -notmatch '^\d{1,3}(\.\d{1,3}){3}$' -or [int]$Spec.vlan_id -lt 1 -or [int]$Spec.vlan_id -gt 4094) { throw 'Unsafe network configuration.' }
   foreach ($mount in @($Spec.private_mounts)) {
     if ($mount.datastore_id -notmatch '^[A-Za-z0-9_.-]+$' -or $mount.path -notmatch '^/[A-Za-z0-9_./-]+$' -or $mount.size -ne '0') {
@@ -82,7 +83,7 @@ function Assert-HorusPlacementConfig([object] $Context, [System.Collections.IDic
   if ($Config.Contains('lock') -and $Config.lock) { throw "CT $($spec.vmid) is locked ($($Config.lock)); never automatically unlock." }
   if ($Config.hostname -ne $spec.hostname -or ($Config.Contains('template') -and $Config.template)) { throw 'CT config identity/template mismatch.' }
   if (-not $Config.Contains('unprivileged') -or [int]$Config.unprivileged -ne 1) { throw 'Expected an unprivileged LXC.' }
-  if (-not $Config.Contains('onboot') -or [int]$Config.onboot -ne 1 -or -not $spec.start_on_boot) { throw 'Expected start_on_boot=true before final start.' }
+  if (-not $Config.Contains('onboot') -or [int]$Config.onboot -ne 1) { throw 'Expected start_on_boot=true before final start.' }
 
   $root = Get-HorusPlacementOptions $Config.rootfs
   if ($root.volume -notmatch '^(local-lvm|storage-infra):[^,\s]+$') { throw 'Unexpected rootfs storage; refusing storage remapping.' }
@@ -129,7 +130,10 @@ function Invoke-HorusLxcPlacement([System.Collections.IDictionary] $Spec, [scrip
   $needsMove = $root.volume -notmatch '^local-lvm:'
 
   if ($guest.status -eq 'running' -and $needsMove) {
-    if (-not $Spec.allow_shutdown) { throw 'Running CT needs placement/rootfs correction; set allow_lxc_shutdown=true only for an approved maintenance window.' }
+    # A CT still running from storage-infra has not completed bootstrap. It may
+    # have been started by onboot after a node restart, so finish the approved
+    # placement transaction instead of requiring an operational shutdown flag.
+    if ($root.volume -notmatch '^storage-infra:') { throw 'Running CT uses an unexpected rootfs datastore; refusing shutdown.' }
     $null = Invoke-HorusPlacementCommand $context $guest.node "pct shutdown $($Spec.vmid) --timeout 120 --forceStop 0"
     $guest = Wait-HorusPlacementState $context $Sleep $guest.node 'stopped'
   }

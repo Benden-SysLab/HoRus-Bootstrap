@@ -60,16 +60,12 @@ run "two_phase_final_node_clone_and_managed_private_volume" {
     error_message = "An adopted existing mount must retain its fully qualified volume ID and explicit size."
   }
   assert {
-    condition     = terraform_data.placement.input.target_node == "horus-pmx-node04" && terraform_data.placement.input.start_on_boot
+    condition     = terraform_data.placement.input.target_node == "horus-pmx-node04" && terraform_data.placement.input.started && terraform_data.placement.input.start_on_boot
     error_message = "Placement barrier must verify the final node and autostart policy."
   }
   assert {
-    condition     = terraform_data.ssh_identity.input.template_vmid == 9001 && terraform_data.ssh_identity.input.template_host_key_sha256 == "SHA256:TemplateFingerprintForTests000000000000000"
-    error_message = "Every LXC must pass the Golden host-key identity barrier before placement/start."
-  }
-  assert {
-    condition     = terraform_data.guest_baseline.input.timezone == "Europe/Moscow"
-    error_message = "Every LXC must receive the approved timezone and deployment baseline before placement/start."
+    condition     = terraform_data.guest_baseline.input.template_vmid == 9001 && terraform_data.guest_baseline.input.template_host_key_sha256 == "SHA256:TemplateFingerprintForTests000000000000000" && terraform_data.guest_baseline.input.timezone == "Europe/Moscow"
+    error_message = "Every LXC must receive a unique SSH identity and approved guest baseline before placement/start."
   }
 }
 

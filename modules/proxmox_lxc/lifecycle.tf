@@ -13,6 +13,7 @@ locals {
     private_mounts = var.private_mounts
     features       = local.final_features
     allow_shutdown = var.allow_lxc_shutdown
+    started        = true
     start_on_boot  = true
   }
   placement_script   = abspath("${path.module}/../../scripts/lxc_placement.ps1")
@@ -22,7 +23,8 @@ locals {
 
 # Provider 0.115.0 has no LXC rootfs move-volume API. This reusable completion
 # barrier performs only same-node rootfs placement/growth, verifies the final
-# state, and starts the CT last. Clone already targets the final node.
+# state, and enforces the explicit final started=true state last. Clone already
+# targets the final node.
 resource "terraform_data" "placement" {
   depends_on = [proxmox_virtual_environment_container.lxc_node, terraform_data.guest_baseline]
 

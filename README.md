@@ -177,8 +177,7 @@ clone from Node03 to another node's non-shared `local-lvm` fails with
 Golden 9001 on Node03/storage-infra
   -> provider full clone
   -> final target node/storage-infra, stopped
-  -> SSH identity barrier: replace inherited Golden host keys
-  -> guest baseline barrier: Europe/Moscow and Jenkins deployment sudo
+  -> pre-start baseline: unique SSH keys, Europe/Moscow and Jenkins sudo
   -> same-node placement helper
   -> pct move-volume rootfs to local-lvm
   -> grow rootfs only when requested size is larger
@@ -187,19 +186,10 @@ Golden 9001 on Node03/storage-infra
   -> running with onboot=1
 ```
 
-The SSH identity barrier runs before the first start. It rotates host keys for
-every stopped clone and, for already-running workloads, only when the ED25519
-key is missing or still equals the recorded Golden 9001 fingerprint. It fails
-closed on a VMID, hostname, type or target-node mismatch. This prevents cloned
-containers from sharing the template's server identity without recreating
-existing LXC workloads.
-
-The guest baseline barrier follows SSH identity and precedes placement. Because
-`bpg/proxmox 0.115.0` does not expose the LXC timezone field, the barrier writes
-and verifies `Europe/Moscow` while the clone is still stopped. It also installs
-the approved Jenkins sudoers policy with the unprivileged container UID/GID
-mapping preserved. Existing running workloads are not changed by this release;
-they receive the baseline when they are recreated.
+One pre-start barrier rotates inherited host keys, writes `Europe/Moscow` and
+installs the approved Jenkins sudoers policy before placement. Existing unique
+keys are preserved. It fails closed on a VMID, hostname, type or target-node
+mismatch and preserves the unprivileged container UID/GID mapping.
 
 The placement helper does not migrate containers between nodes. It is idempotent,
 never shrinks disks and fails closed on an unexpected identity, node, storage,
@@ -322,12 +312,11 @@ terraform fmt -check -recursive
 terraform validate
 terraform test
 pwsh -NoProfile -File tests/lxc_placement.tests.ps1
-pwsh -NoProfile -File tests/lxc_ssh_identity.tests.ps1
 pwsh -NoProfile -File tests/lxc_guest_baseline.tests.ps1
 ```
 
-Current results: 5 Terraform tests passed, 0 failed; 7 offline placement tests
-7 offline SSH-identity tests and 7 offline guest-baseline tests passed.
+The focused PowerShell suites cover placement and the combined pre-start
+identity/timezone/sudo baseline.
 
 ## Known limitations
 
@@ -346,11 +335,10 @@ Current results: 5 Terraform tests passed, 0 failed; 7 offline placement tests
 | `topology.tf` | authoritative nodes, VLANs, workloads and storage consumers |
 | `main.tf` | storage resources and dynamic VM/LXC module calls |
 | `modules/proxmox_vm/` | provider-native VM lifecycle |
-| `modules/proxmox_lxc/` | provider-owned LXC, SSH-identity and placement barriers |
+| `modules/proxmox_lxc/` | provider-owned LXC, pre-start baseline and placement barriers |
 | `scripts/lxc_placement.ps1` | minimal Terraform entry point for LXC placement |
 | `scripts/lib/Horus.LxcPlacement.ps1` | fail-closed placement implementation |
-| `scripts/lxc_ssh_identity.ps1` | minimal Terraform entry point for LXC SSH identity |
-| `scripts/lib/Horus.LxcSshIdentity.ps1` | fail-closed host-key reconciliation |
+| `scripts/lxc_guest_baseline.ps1` | combined SSH identity, timezone and deployment-sudo baseline |
 | `tests/` | inventory, module and offline helper tests |
 | `ARCHITECTURE.md` | ownership and design rationale |
 | `BACKLOG.md` | remaining work |
