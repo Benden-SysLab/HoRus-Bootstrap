@@ -1,5 +1,49 @@
 # HoRus-Bootstrap release notes
 
+## v2.2.2
+
+Release: `v2.2.2`.
+
+### Europe/Moscow LXC baseline
+
+- Read-only audit confirmed that all 22 deployed LXC workloads and Golden 9001
+  used `Etc/UTC` (`+0000`).
+- Updated only the external Golden 9001 Proxmox configuration to
+  `timezone: Europe/Moscow`; the template remained stopped and no workload was
+  restarted or recreated.
+- Added a fail-closed guest-baseline barrier between SSH identity and placement.
+  Future stopped clones receive and verify `Europe/Moscow` plus the approved
+  Jenkins deployment sudoers policy before first start. Offline ownership uses
+  the existing unprivileged UID/GID mapping rather than host root ownership.
+- Provider `bpg/proxmox 0.115.0` has no LXC timezone attribute, so this narrowly
+  scoped helper covers the unsupported guest transition.
+- The guarded plan is intentionally not applied: `22 to add, 0 to change,
+  0 to destroy`, consisting only of `terraform_data.guest_baseline` resources.
+
+### LXC SSH host identity hardening
+
+- Recorded the Golden LXC 9001 ED25519 fingerprint as a deny value and added a
+  Terraform completion barrier before LXC placement/start.
+- New stopped clones receive fresh SSH host keys offline before first boot.
+  Existing running LXC workloads rotate only when their ED25519 key is missing
+  or still equals the Golden fingerprint; already-unique keys are preserved.
+- The reconciliation verifies VMID, hostname, LXC type and final node before
+  mutation and refuses Golden VMID 9001. It does not recreate containers or
+  modify workload topology.
+- Added 7 offline SSH-identity tests. Operators must refresh affected
+  Jenkins/client `known_hosts` entries after independently verifying each new
+  fingerprint.
+
+### Jenkins deployment privilege correction
+
+- Reconciled `/etc/sudoers.d/jenkins-srv` on all 28 workloads without guest
+  restarts. The root-owned mode `0440` rule grants the non-interactive Jenkins
+  deployment account passwordless sudo for Ansible rollout duties.
+- Validated every guest with `visudo -cf /etc/sudoers` and a real
+  `runuser -u jenkins-srv -- sudo -n id -u` check. The new guest-baseline
+  barrier makes this minimal bootstrap contract durable for recreated LXC;
+  HoRus-Basis consumes it for deployment automation.
+
 ## v2.2.1
 
 Release: `v2.2.1`.

@@ -5,22 +5,24 @@ provider "proxmox" {
 }
 
 variables {
-  target_node            = "horus-pmx-node04"
-  vmid                   = 405
-  hostname               = "horus-s3-srv01"
-  cores                  = 2
-  memory                 = 2048
-  disk_size              = "16"
-  root_storage           = "local-lvm"
-  bridge                 = "vmbr0"
-  vlan_id                = 150
-  ip_address             = "198.51.100.88/28"
-  gateway                = "198.51.100.81"
-  dns_servers            = ["203.0.113.53"]
-  feature_profile        = "storage"
-  bootstrap_ssh_key_path = "C:/test/key"
-  private_mount_volumes  = ["logs-data", "pg-local:301/subvol-301-disk-0.subvol"]
-  private_mount_sizes    = ["0", "8G"]
+  target_node                    = "horus-pmx-node04"
+  vmid                           = 405
+  hostname                       = "horus-s3-srv01"
+  cores                          = 2
+  memory                         = 2048
+  disk_size                      = "16"
+  root_storage                   = "local-lvm"
+  bridge                         = "vmbr0"
+  vlan_id                        = 150
+  ip_address                     = "198.51.100.88/28"
+  gateway                        = "198.51.100.81"
+  dns_servers                    = ["203.0.113.53"]
+  feature_profile                = "storage"
+  clone_template_host_key_sha256 = "SHA256:TemplateFingerprintForTests000000000000000"
+  timezone                       = "Europe/Moscow"
+  bootstrap_ssh_key_path         = "C:/test/key"
+  private_mount_volumes          = ["logs-data", "pg-local:301/subvol-301-disk-0.subvol"]
+  private_mount_sizes            = ["0", "8G"]
   private_mounts = [
     {
       datastore_id = "logs-data"
@@ -60,6 +62,14 @@ run "two_phase_final_node_clone_and_managed_private_volume" {
   assert {
     condition     = terraform_data.placement.input.target_node == "horus-pmx-node04" && terraform_data.placement.input.start_on_boot
     error_message = "Placement barrier must verify the final node and autostart policy."
+  }
+  assert {
+    condition     = terraform_data.ssh_identity.input.template_vmid == 9001 && terraform_data.ssh_identity.input.template_host_key_sha256 == "SHA256:TemplateFingerprintForTests000000000000000"
+    error_message = "Every LXC must pass the Golden host-key identity barrier before placement/start."
+  }
+  assert {
+    condition     = terraform_data.guest_baseline.input.timezone == "Europe/Moscow"
+    error_message = "Every LXC must receive the approved timezone and deployment baseline before placement/start."
   }
 }
 

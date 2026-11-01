@@ -20,8 +20,15 @@ locals {
     "180" = { name = "K8S-LAB", cidr = var.environment.vlan_networks["180"].cidr, gateway = var.environment.vlan_networks["180"].gateway }
   }
 
-  vm_template  = { vm_id = 9000, node_name = "horus-pmx-node03", datastore_id = "local-lvm", root_gib = 12 }
-  lxc_template = { vm_id = 9001, node_name = "horus-pmx-node03", datastore_id = "storage-infra", root_gib = 8 }
+  vm_template = { vm_id = 9000, node_name = "horus-pmx-node03", datastore_id = "local-lvm", root_gib = 12 }
+  lxc_template = {
+    vm_id                   = 9001
+    node_name               = "horus-pmx-node03"
+    datastore_id            = "storage-infra"
+    root_gib                = 8
+    timezone                = "Europe/Moscow"
+    ssh_host_ed25519_sha256 = "SHA256:BsT103l0tOKe3PXYSDAYPnBtoj0aKmHfDAayuF0mPpY"
+  }
 
   target_root_datastore = "local-lvm"
 

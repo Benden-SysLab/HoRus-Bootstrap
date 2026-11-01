@@ -97,6 +97,10 @@ Node01 使用 VMID 101-108。`horus-gg-srv01`（VMID 108、LXC、VLAN 150）是�
 | 9000 | Debian 13 VM | Node03 / `local-lvm` | 12 GiB |
 | 9001 | Debian 13 非特权 LXC | Node03 / `storage-infra` | 8 GiB |
 
+Golden 9001 现在使用 `timezone: Europe/Moscow`。Terraform guest-baseline barrier
+会在首次启动前配置并验证 UTC+3、唯一 SSH host key 和 Jenkins deployment sudo
+规则。现有 workload 在计划重建前不会被修改。
+
 两个模板都是外部 prerequisites，不属于 Terraform state。
 
 ### VM 生命周期
@@ -136,7 +140,10 @@ backup 使用 `storage-infra:301/vm-301-disk-1.raw`。Guardian AI 不会获得�
 PostgreSQL 文件。
 
 Golden guest 内已禁用 root SSH。`abbenden-srv` 使用 SSH key 和需要密码的
-sudo，不配置广泛的 `NOPASSWD`。`jenkins-srv` 没有广泛 sudo 权限。所有 LXC
+sudo，不配置广泛的 `NOPASSWD`。`jenkins-srv` 是 Jenkins/Ansible 的非交互式部署
+账户，通过 root 所有、模式 `0440` 的 `/etc/sudoers.d/jenkins-srv` 在全部 workload
+上使用免密码 sudo。这是一条明确的广泛信任边界；HoRus-Bootstrap 维护最小 bootstrap
+contract，HoRus-Basis 将其用于 deployment。所有 LXC
 均为非特权容器。不得提交 credential 或 private key。
 
 ## 操作

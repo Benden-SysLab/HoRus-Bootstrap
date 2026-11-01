@@ -24,7 +24,7 @@ locals {
 # barrier performs only same-node rootfs placement/growth, verifies the final
 # state, and starts the CT last. Clone already targets the final node.
 resource "terraform_data" "placement" {
-  depends_on = [proxmox_virtual_environment_container.lxc_node]
+  depends_on = [proxmox_virtual_environment_container.lxc_node, terraform_data.guest_baseline]
 
   input = local.placement_spec
   triggers_replace = [

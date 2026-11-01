@@ -101,6 +101,10 @@ local placement is complete.
 ```text
 provider full clone of 9001
   -> final node / storage-infra / stopped
+  -> terraform_data SSH identity barrier
+  -> fresh workload SSH host keys
+  -> terraform_data guest baseline barrier
+  -> Europe/Moscow + Jenkins deployment sudo
   -> terraform_data placement barrier
   -> same-node pct move-volume rootfs local-lvm
   -> upward-only pct resize when required
@@ -114,6 +118,22 @@ from shared storage to node-local storage without a replacement. The minimal
 PowerShell helper covers only that gap. It receives its manifest from Terraform
 JSON and does not invent topology.
 
+The separate SSH identity barrier closes a template-cloning security gap before
+placement starts the container. A stopped clone always receives new host keys
+offline. An existing running LXC is changed only if its ED25519 key is missing
+or exactly equals the recorded Golden 9001 fingerprint; an already-unique key
+is verified and preserved. VMID, hostname, LXC type and final node are checked
+before mutation. Golden 9001 itself is rejected by the helper and remains
+external to Terraform state.
+
+The guest baseline barrier runs after SSH identity and before placement/start.
+Provider 0.115.0 does not expose the Proxmox LXC timezone field, so Terraform
+cannot express this transition directly on the container resource. The minimal
+helper writes and verifies `Europe/Moscow`, installs the approved Jenkins
+sudoers file, preserves the unprivileged root UID/GID mapping for offline
+clones, and fails closed on identity or node mismatch. Golden 9001 separately
+declares `timezone: Europe/Moscow` in its external Proxmox configuration.
+
 The helper is fail-closed and idempotent:
 
 - verifies VMID, hostname, LXC type, final node and unprivileged state;
@@ -125,7 +145,8 @@ The helper is fail-closed and idempotent:
 - starts the CT only after final node/storage/size checks pass;
 - performs no mutation when the CT is already correct and running.
 
-The placement barrier is ordered after the LXC resource. Its replacement
+The SSH identity barrier is ordered after the LXC resource, the guest baseline
+after SSH identity, and placement after guest-baseline verification. Their replacement
 triggers contain only the stable desired placement specification and helper
 implementation hashes. Runtime provider values are deliberately excluded.
 A real LXC replacement still retriggers placement through
@@ -240,7 +261,12 @@ not published here.
 
 Golden guests have root SSH disabled. `abbenden-srv` authenticates with an SSH
 key and uses password-protected sudo without blanket `NOPASSWD`.
-`jenkins-srv` authenticates with an SSH key and has no broad sudo permission.
+`jenkins-srv` is the non-interactive Jenkins/Ansible deployment account. It
+authenticates with an SSH key and has passwordless sudo on every workload via
+the root-owned, mode `0440` `/etc/sudoers.d/jenkins-srv` rule. This is an
+explicit broad trust boundary. HoRus-Bootstrap owns this minimal pre-start
+sudoers contract through the guest-baseline barrier; HoRus-Basis consumes the
+account for deployment automation.
 All containers are unprivileged.
 
 The placement helper connects to Proxmox nodes, not workload guests. It uses an

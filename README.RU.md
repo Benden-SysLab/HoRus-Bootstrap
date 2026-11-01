@@ -10,9 +10,13 @@ English documentation: [README.md](README.md). Подробная архитек
 
 ## Статус
 
-Текущее desired state развёрнуто и приведено к сходящемуся состоянию. После
-удаления дублирующего Ansible-хоста и уплотнения VMID Node02
-`terraform plan -parallelism=5` вернул:
+Инфраструктура v2.2.1 остаётся развёрнутой. Release v2.2.2 готовит следующее
+пересоздание LXC с уникальными SSH host identities, timezone `Europe/Moscow`
+и deployment sudo для Jenkins. Baseline намеренно не применялся к текущим
+workloads: проверенный plan содержит только 22 новых
+`terraform_data.guest_baseline`, без update/replacement VM или LXC.
+
+До подготовки v2.2.2 steady state v2.2.1 возвращал:
 
 ```text
 No changes. Your infrastructure matches the configuration.
@@ -144,6 +148,11 @@ state. Terraform не должен создавать, импортироват�
 | 9000 | Debian 13 VM | Node03 / `local-lvm` | 12 GiB | источник VM clones |
 | 9001 | Debian 13 LXC | Node03 / `storage-infra` | 8 GiB | unprivileged, shared clone source |
 
+Во внешней Proxmox-конфигурации Golden 9001 теперь задано
+`timezone: Europe/Moscow`. Terraform также фиксирует `Europe/Moscow` как
+обязательный baseline clone, поэтому будущие LXC проверяются на UTC+3 до
+первого запуска.
+
 ### Жизненный цикл VM
 
 VM создаются полностью средствами provider:
@@ -169,6 +178,8 @@ lifecycle:
 Golden 9001 на Node03/storage-infra
   -> provider full clone
   -> финальная node/storage-infra, stopped
+  -> SSH identity barrier: замена унаследованных Golden host keys
+  -> guest baseline barrier: Europe/Moscow и Jenkins deployment sudo
   -> same-node placement helper
   -> pct move-volume rootfs в local-lvm
   -> grow rootfs только при необходимости
@@ -177,7 +188,21 @@ Golden 9001 на Node03/storage-infra
   -> running с onboot=1
 ```
 
-Helper не выполняет межнодовую миграцию контейнеров. Он идемпотентен, никогда
+SSH identity barrier выполняется до первого запуска. Для каждого stopped clone
+он генерирует новые host keys, а у уже работающего workload меняет ключ только
+если ED25519 отсутствует или совпадает с зафиксированным fingerprint Golden
+9001. При несовпадении VMID, hostname, типа или target node процесс завершается
+без изменений. Так существующие LXC исправляются без пересоздания, а новые не
+могут запуститься с общей SSH identity шаблона.
+
+Guest baseline barrier выполняется после SSH identity и до placement. В
+`bpg/proxmox 0.115.0` нет поля LXC timezone, поэтому barrier записывает и
+проверяет `Europe/Moscow`, пока clone ещё остановлен. Он также устанавливает
+утверждённый Jenkins sudoers с сохранением UID/GID mapping unprivileged LXC.
+Текущие running workloads этим release не изменяются: baseline применяется
+при их пересоздании.
+
+Placement helper не выполняет межнодовую миграцию контейнеров. Он идемпотентен, никогда
 не уменьшает диски и жёстко останавливается при неожиданном identity, node,
 storage, lock, network или mount configuration.
 
@@ -238,12 +263,23 @@ shared trees.
 ## Security model
 
 В Golden baseline отключён root SSH внутри guests. `abbenden-srv` использует
-SSH key и sudo с паролем; blanket `NOPASSWD` отсутствует. `jenkins-srv`
-использует SSH key и не имеет широкого sudo. Все LXC — unprivileged.
+SSH key и sudo с паролем; blanket `NOPASSWD` для него отсутствует.
+`jenkins-srv` — non-interactive deployment account: он использует SSH key и
+имеет passwordless sudo на всех workloads через root-owned файл mode `0440`
+`/etc/sudoers.d/jenkins-srv`. Это осознанная широкая граница доверия
+Jenkins/Ansible. Минимальным bootstrap sudoers contract владеет
+HoRus-Bootstrap, а HoRus-Basis использует его для deployment automation. Все
+LXC остаются unprivileged.
 
 Оператор передаёт только локальный путь к key-файлу для подключения placement
 helper к Proxmox nodes. Credentials, содержимое private keys и пароли нельзя
 добавлять в репозиторий.
+
+SSH identity Golden template не является допустимой identity workload.
+Fingerprint ED25519 Golden 9001 хранится как запрещённое значение: каждый LXC
+должен получить отличный ключ до запуска placement. После ротации ключа уже
+развёрнутого контейнера соответствующую запись Jenkins/client `known_hosts`
+нужно обновить только после независимой проверки нового fingerprint.
 
 ## Prerequisites и configuration
 
@@ -292,10 +328,12 @@ terraform fmt -check -recursive
 terraform validate
 terraform test
 pwsh -NoProfile -File tests/lxc_placement.tests.ps1
+pwsh -NoProfile -File tests/lxc_ssh_identity.tests.ps1
+pwsh -NoProfile -File tests/lxc_guest_baseline.tests.ps1
 ```
 
 Текущий результат: 5 Terraform tests passed, 0 failed; 7 offline placement
-tests passed.
+tests, 7 offline SSH-identity tests и 7 offline guest-baseline tests passed.
 
 ## Известные ограничения
 

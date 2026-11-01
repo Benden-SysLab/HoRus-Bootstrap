@@ -101,6 +101,11 @@ Node01 використовує VMID 101-108. `horus-gg-srv01` (VMID 108, LXC, V
 | 9000 | Debian 13 VM | Node03 / `local-lvm` | 12 GiB |
 | 9001 | Debian 13 LXC, unprivileged | Node03 / `storage-infra` | 8 GiB |
 
+Golden 9001 тепер використовує `timezone: Europe/Moscow`. До першого запуску
+Terraform guest-baseline barrier налаштовує та перевіряє UTC+3, унікальні SSH
+host keys і Jenkins deployment sudo rule. Поточні workloads не змінюються до
+запланованого пересоздання.
+
 Обидва templates є зовнішніми prerequisites і не входять до Terraform state.
 
 ### Життєвий цикл VM
@@ -141,7 +146,11 @@ rootfs, тому backup використовує `storage-infra:301/vm-301-disk-
 Guardian AI не отримує raw PostgreSQL files.
 
 Root SSH вимкнено в Golden guests. `abbenden-srv` використовує SSH key і sudo
-з паролем без blanket `NOPASSWD`. `jenkins-srv` не має широкого sudo. Усі LXC
+з паролем без blanket `NOPASSWD`. `jenkins-srv` — non-interactive deployment
+account Jenkins/Ansible із passwordless sudo на всіх workloads через root-owned
+файл `/etc/sudoers.d/jenkins-srv` mode `0440`. Це явна широка межа довіри.
+Мінімальний bootstrap contract підтримує HoRus-Bootstrap, а HoRus-Basis
+використовує його для deployment. Усі LXC
 непривілейовані. Credentials і private keys не можна коммітити.
 
 ## Експлуатація

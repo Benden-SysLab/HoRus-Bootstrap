@@ -10,9 +10,13 @@ Russian documentation: [README.RU.md](README.RU.md). Detailed design:
 
 ## Status
 
-The current desired topology is deployed and converged. After removing the
-duplicate dedicated Ansible host and compacting Node02 VMIDs,
-`terraform plan -parallelism=5` returned:
+The v2.2.1 infrastructure remains deployed. Release v2.2.2 prepares the next
+LXC recreation with unique SSH host identities, the `Europe/Moscow` timezone
+and Jenkins deployment sudo. The baseline resources are intentionally not
+applied to the current workloads: the reviewed plan contains only 22 new
+`terraform_data.guest_baseline` barriers and no VM/LXC update or replacement.
+
+Before the v2.2.2 preparation, the v2.2.1 steady state returned:
 
 ```text
 No changes. Your infrastructure matches the configuration.
@@ -145,6 +149,10 @@ Terraform must never create, import, replace or destroy them.
 | 9000 | Debian 13 VM | Node03 / `local-lvm` | 12 GiB | VM clone source |
 | 9001 | Debian 13 LXC | Node03 / `storage-infra` | 8 GiB | unprivileged, shared clone source |
 
+Golden 9001 now declares `timezone: Europe/Moscow` in its external Proxmox
+configuration. Terraform also treats `Europe/Moscow` as an explicit clone
+baseline, so future LXC workloads are verified at UTC+3 before first start.
+
 ### VM lifecycle
 
 VM provisioning is provider-native:
@@ -169,6 +177,8 @@ clone from Node03 to another node's non-shared `local-lvm` fails with
 Golden 9001 on Node03/storage-infra
   -> provider full clone
   -> final target node/storage-infra, stopped
+  -> SSH identity barrier: replace inherited Golden host keys
+  -> guest baseline barrier: Europe/Moscow and Jenkins deployment sudo
   -> same-node placement helper
   -> pct move-volume rootfs to local-lvm
   -> grow rootfs only when requested size is larger
@@ -177,7 +187,21 @@ Golden 9001 on Node03/storage-infra
   -> running with onboot=1
 ```
 
-The helper does not migrate containers between nodes. It is idempotent,
+The SSH identity barrier runs before the first start. It rotates host keys for
+every stopped clone and, for already-running workloads, only when the ED25519
+key is missing or still equals the recorded Golden 9001 fingerprint. It fails
+closed on a VMID, hostname, type or target-node mismatch. This prevents cloned
+containers from sharing the template's server identity without recreating
+existing LXC workloads.
+
+The guest baseline barrier follows SSH identity and precedes placement. Because
+`bpg/proxmox 0.115.0` does not expose the LXC timezone field, the barrier writes
+and verifies `Europe/Moscow` while the clone is still stopped. It also installs
+the approved Jenkins sudoers policy with the unprivileged container UID/GID
+mapping preserved. Existing running workloads are not changed by this release;
+they receive the baseline when they are recreated.
+
+The placement helper does not migrate containers between nodes. It is idempotent,
 never shrinks disks and fails closed on an unexpected identity, node, storage,
 lock, network or mount configuration.
 
@@ -237,11 +261,21 @@ inside guests, invent UID/GID mappings or change ownership of shared trees.
 
 The Golden baseline disables root SSH inside guests. `abbenden-srv` uses an SSH
 key and password-protected sudo; no blanket `NOPASSWD` is granted.
-`jenkins-srv` uses an SSH key and has no broad sudo access. All LXC containers
-are unprivileged.
+`jenkins-srv` is the non-interactive deployment account. It uses an SSH key and
+has passwordless sudo on every workload through the root-owned, mode `0440`
+`/etc/sudoers.d/jenkins-srv` rule. This deliberately broad permission is part
+of the Jenkins/Ansible trust boundary. HoRus-Bootstrap owns this minimal
+bootstrap sudoers contract; HoRus-Basis consumes it for deployment automation.
+All LXC containers remain unprivileged.
 
 The operator provides only a local key file path for the Proxmox-node placement
 connection. Never commit credentials, private-key content or passwords.
+
+Golden templates must not be treated as valid workload SSH identities. The
+recorded Golden 9001 ED25519 fingerprint is a deny value: each LXC must have a
+different key before placement can start it. Rotating a deployed key requires
+the corresponding Jenkins/client `known_hosts` entry to be refreshed after its
+new fingerprint is verified out of band.
 
 ## Prerequisites and configuration
 
@@ -288,10 +322,12 @@ terraform fmt -check -recursive
 terraform validate
 terraform test
 pwsh -NoProfile -File tests/lxc_placement.tests.ps1
+pwsh -NoProfile -File tests/lxc_ssh_identity.tests.ps1
+pwsh -NoProfile -File tests/lxc_guest_baseline.tests.ps1
 ```
 
 Current results: 5 Terraform tests passed, 0 failed; 7 offline placement tests
-passed.
+7 offline SSH-identity tests and 7 offline guest-baseline tests passed.
 
 ## Known limitations
 
@@ -310,9 +346,11 @@ passed.
 | `topology.tf` | authoritative nodes, VLANs, workloads and storage consumers |
 | `main.tf` | storage resources and dynamic VM/LXC module calls |
 | `modules/proxmox_vm/` | provider-native VM lifecycle |
-| `modules/proxmox_lxc/` | provider-owned LXC and placement barrier |
+| `modules/proxmox_lxc/` | provider-owned LXC, SSH-identity and placement barriers |
 | `scripts/lxc_placement.ps1` | minimal Terraform entry point for LXC placement |
 | `scripts/lib/Horus.LxcPlacement.ps1` | fail-closed placement implementation |
+| `scripts/lxc_ssh_identity.ps1` | minimal Terraform entry point for LXC SSH identity |
+| `scripts/lib/Horus.LxcSshIdentity.ps1` | fail-closed host-key reconciliation |
 | `tests/` | inventory, module and offline helper tests |
 | `ARCHITECTURE.md` | ownership and design rationale |
 | `BACKLOG.md` | remaining work |

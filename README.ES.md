@@ -101,6 +101,11 @@ Node01 usa VMID 101-108. `horus-gg-srv01` (VMID 108, LXC, VLAN 150) es el scanne
 | 9000 | VM Debian 13 | Node03 / `local-lvm` | 12 GiB |
 | 9001 | LXC Debian 13 sin privilegios | Node03 / `storage-infra` | 8 GiB |
 
+Golden 9001 ahora usa `timezone: Europe/Moscow`. Antes del primer arranque, la
+barrera guest-baseline de Terraform configura y verifica UTC+3, claves SSH de
+host únicas y la regla sudo de despliegue de Jenkins. Los workloads actuales
+no cambian hasta su recreación planificada.
+
 Ambas plantillas son requisitos externos y no forman parte del state de
 Terraform.
 
@@ -144,7 +149,11 @@ PostgreSQL sin procesar.
 
 El acceso SSH de root está deshabilitado dentro de los Golden guests.
 `abbenden-srv` usa clave SSH y sudo con contraseña, sin `NOPASSWD` global.
-`jenkins-srv` no posee sudo amplio. Todos los LXC son sin privilegios. Nunca se
+`jenkins-srv` es la cuenta no interactiva de despliegue Jenkins/Ansible y tiene
+sudo sin contraseña en todos los workloads mediante
+`/etc/sudoers.d/jenkins-srv`, propiedad de root y modo `0440`. Este permiso
+amplio es una frontera de confianza explícita. HoRus-Bootstrap administra este
+contrato mínimo y HoRus-Basis lo usa para deployments. Todos los LXC son sin privilegios. Nunca se
 deben guardar credenciales ni claves privadas en el repositorio.
 
 ## Operación

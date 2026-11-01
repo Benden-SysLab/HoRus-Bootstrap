@@ -101,6 +101,11 @@ Node01 の VMID 範囲は 101-108 です。`horus-gg-srv01`（VMID 108、LXC、V
 | 9000 | Debian 13 VM | Node03 / `local-lvm` | 12 GiB |
 | 9001 | Debian 13 非特権 LXC | Node03 / `storage-infra` | 8 GiB |
 
+Golden 9001 は `timezone: Europe/Moscow` を使用します。Terraform の
+guest-baseline barrier は初回起動前に UTC+3、固有の SSH host key、Jenkins
+deployment sudo rule を設定して検証します。既存 workload は計画された再作成まで
+変更されません。
+
 どちらも外部 prerequisite であり、Terraform state の管理対象外です。
 
 ### VM ライフサイクル
@@ -142,7 +147,10 @@ Guardian AI に PostgreSQL の raw files は渡しません。
 
 Golden guest では root SSH を無効化しています。`abbenden-srv` は SSH key と
 パスワード付き sudo を使用し、包括的な `NOPASSWD` はありません。
-`jenkins-srv` に広範な sudo 権限はありません。全 LXC は非特権です。
+`jenkins-srv` は Jenkins/Ansible の非対話型デプロイアカウントであり、root 所有、
+モード `0440` の `/etc/sudoers.d/jenkins-srv` により全 workload でパスワードなし
+sudo を使用します。これは明示的な広い信頼境界です。この最小 bootstrap contract は
+HoRus-Bootstrap が管理し、HoRus-Basis が deployment に使用します。全 LXC は非特権です。
 credential や private key を commit してはいけません。
 
 ## 運用

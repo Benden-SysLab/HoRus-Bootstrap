@@ -35,6 +35,24 @@ variable "clone_storage" {
   default = "storage-infra"
 }
 
+variable "clone_template_host_key_sha256" {
+  type        = string
+  description = "ED25519 SHA256 fingerprint inherited from Golden LXC 9001 and forbidden on workload clones"
+  validation {
+    condition     = can(regex("^SHA256:[A-Za-z0-9+/=]+$", var.clone_template_host_key_sha256))
+    error_message = "Golden LXC ED25519 fingerprint must use OpenSSH SHA256 format."
+  }
+}
+
+variable "timezone" {
+  type        = string
+  description = "Approved IANA timezone applied before the first LXC start"
+  validation {
+    condition     = var.timezone == "Europe/Moscow"
+    error_message = "HoRus LXC workloads must use Europe/Moscow."
+  }
+}
+
 variable "private_mounts" {
   type = list(object({
     datastore_id = string
