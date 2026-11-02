@@ -89,7 +89,7 @@ Kubernetes Pod и Service CIDR относятся к environment-specific сет
 
 | Node | VMID | Тип | Hostname | Адрес | VLAN |
 |---|---:|---|---|---|---:|
-| Node01 | 101 | LXC | `horus-lb-srv01` | private | 170 |
+| Node01 | 101 | LXC | `horus-lb-srv01` | private | 101 |
 | Node01 | 102 | LXC | `horus-agent-srv01` | private | 101 |
 | Node01 | 103 | VM | `horus-jnk-srv01` | private | 101 |
 | Node01 | 104 | LXC | `horus-ai-srv01` | private | 150 |

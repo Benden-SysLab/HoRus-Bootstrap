@@ -39,12 +39,25 @@ function Get-HorusLxcGuestBaselineGuest([object] $Context) {
 
 function Get-HorusLxcGuestBaselineScript([string] $Root = '') {
   $prefix = if ($Root) { $Root } else { '' }
+  $ensureHostKeys = if ($Root) { 'ssh-keygen -A -f "$root"' } else { ':' }
+  $repairHostKeyOwnership = if ($Root) {
+    'chown --reference="$ssh_owner" "$ssh_dir"/ssh_host_*_key "$ssh_dir"/ssh_host_*_key.pub'
+  } else {
+    ':'
+  }
   return @"
 set -eu
 root='$prefix'
 zone='Europe/Moscow'
 zonefile="`$root/usr/share/zoneinfo/`$zone"
 test -f "`$zonefile"
+ssh_dir="`$root/etc/ssh"
+ssh_owner="`$ssh_dir/sshd_config"
+test -f "`$ssh_owner"
+$ensureHostKeys
+$repairHostKeyOwnership
+chmod 0600 "`$ssh_dir"/ssh_host_*_key
+chmod 0644 "`$ssh_dir"/ssh_host_*_key.pub
 ln -snf "/usr/share/zoneinfo/`$zone" "`$root/etc/localtime"
 tz_tmp="`$(mktemp "`$root/etc/.timezone.XXXXXX")"
 printf '%s\n' "`$zone" > "`$tz_tmp"
@@ -120,7 +133,7 @@ function Invoke-HorusLxcGuestBaseline([System.Collections.IDictionary] $Spec, [s
   if ($guest.status -eq 'running') {
     $script = Get-HorusLxcGuestBaselineScript
     $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($script))
-    $command = "pct exec $vmid -- sh -ceu 'echo $encoded | base64 -d | sh; visudo -cf /etc/sudoers >/dev/null; runuser -u jenkins-srv -- sudo -n id -u | grep -qx 0; test `"`$(date +%z)`" = +0300'"
+    $command = "sh -ceu 'pid=`$(lxc-info -n $vmid -pH); root=/proc/`$pid/root; test -d `"`$root/etc/ssh`"; chown --reference=`"`$root/etc/ssh/sshd_config`" `"`$root/etc/ssh/`"ssh_host_*_key `"`$root/etc/ssh/`"ssh_host_*_key.pub'; pct exec $vmid -- sh -ceu 'echo $encoded | base64 -d | sh; install -d -o root -g root -m 0755 /run/sshd; /usr/sbin/sshd -t; systemctl restart ssh; systemctl is-active --quiet ssh; visudo -cf /etc/sudoers >/dev/null; runuser -u jenkins-srv -- sudo -n id -u | grep -qx 0; test `"`$(date +%z)`" = +0300'"
   } else {
     $root = "/var/lib/lxc/$vmid/rootfs"
     $script = Get-HorusLxcGuestBaselineScript $root

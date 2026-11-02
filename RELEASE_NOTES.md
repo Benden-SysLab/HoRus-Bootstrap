@@ -1,5 +1,14 @@
 # HoRus-Bootstrap release notes
 
+## Unreleased
+
+- Corrected unprivileged-LXC host-key ownership after offline generation. Keys
+  now inherit mapped guest-root ownership, retain `0600`/`0644` modes and are
+  validated with `sshd -t`; existing running containers are repaired in place
+  without recreation.
+- Returned `horus-lb-srv01` to the common VLAN 101 workload network instead of
+  the isolated VLAN 170 placement.
+
 ## v2.2.3
 
 Release: `v2.2.3`.

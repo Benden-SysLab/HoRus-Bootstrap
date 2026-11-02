@@ -28,7 +28,7 @@ environment = {
   }
 
   workload_ips = {
-    horus-lb-srv01 = "198.51.100.114/28"
+    horus-lb-srv01 = "198.51.100.12/28"
     horus-agent-srv01 = "198.51.100.2/28"
     horus-jnk-srv01 = "198.51.100.3/28"
     horus-ai-srv01 = "198.51.100.82/28"

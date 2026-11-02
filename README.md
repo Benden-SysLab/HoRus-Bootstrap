@@ -90,7 +90,7 @@ private network design rather than documented in this public repository.
 
 | Node | VMID | Type | Hostname | VLAN |
 |---|---:|---|---|---:|
-| Node01 | 101 | LXC | `horus-lb-srv01` | 170 |
+| Node01 | 101 | LXC | `horus-lb-srv01` | 101 |
 | Node01 | 102 | LXC | `horus-agent-srv01` | 101 |
 | Node01 | 103 | VM | `horus-jnk-srv01` | 101 |
 | Node01 | 104 | LXC | `horus-ai-srv01` | 150 |

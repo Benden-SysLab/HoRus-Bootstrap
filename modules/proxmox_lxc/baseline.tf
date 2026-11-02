@@ -7,7 +7,9 @@ locals {
     template_host_key_sha256 = var.clone_template_host_key_sha256
     timezone                 = var.timezone
   }
-  guest_baseline_script = abspath("${path.module}/../../scripts/lxc_guest_baseline.ps1")
+  guest_baseline_script   = abspath("${path.module}/../../scripts/lxc_guest_baseline.ps1")
+  guest_baseline_library  = abspath("${path.module}/../../scripts/lib/Horus.LxcGuestBaseline.ps1")
+  guest_baseline_revision = [filesha256(local.guest_baseline_script), filesha256(local.guest_baseline_library)]
 }
 
 # The former SSH-only barrier is now the combined pre-start baseline. Preserve
@@ -24,6 +26,11 @@ resource "terraform_data" "guest_baseline" {
   depends_on = [proxmox_virtual_environment_container.lxc_node]
 
   input = local.guest_baseline_spec
+
+  triggers_replace = [
+    local.guest_baseline_spec,
+    local.guest_baseline_revision,
+  ]
 
   lifecycle {
     replace_triggered_by = [proxmox_virtual_environment_container.lxc_node]

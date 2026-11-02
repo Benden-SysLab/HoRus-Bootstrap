@@ -52,6 +52,7 @@ $f = New-Fixture -Status stopped
 Invoke-HorusLxcGuestBaseline $f.Spec $f.Remote
 $commands = $f.State.Commands -join "`n"
 Assert-Test ($commands -match 'ssh-keygen -A -f' -and $commands -match 'base64 -d') 'Stopped clone did not receive identity and baseline.'
+Assert-Test ((Get-HorusLxcGuestBaselineScript '/var/lib/lxc/401/rootfs') -match 'chown --reference=') 'Stopped clone host keys did not inherit mapped root ownership.'
 $passed++
 
 $f = New-Fixture -Status running -Fingerprint 'SHA256:AlreadyUniqueFingerprint222222222222222222'

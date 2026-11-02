@@ -105,7 +105,7 @@ locals {
   }
 
   workloads = {
-    "horus-lb-srv01"    = { vmid = 101, hostname = "horus-lb-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 1, memory = 1024, disk_size = "12", ip_address = var.environment.workload_ips["horus-lb-srv01"], vlan_id = 170, feature_profile = "standard" }
+    "horus-lb-srv01"    = { vmid = 101, hostname = "horus-lb-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 1, memory = 1024, disk_size = "12", ip_address = var.environment.workload_ips["horus-lb-srv01"], vlan_id = 101, feature_profile = "standard" }
     "horus-agent-srv01" = { vmid = 102, hostname = "horus-agent-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 4, memory = 4096, disk_size = "20", ip_address = var.environment.workload_ips["horus-agent-srv01"], vlan_id = 101, feature_profile = "docker", shared_datasets = [{ storage_name = "artifacts", path = var.environment.guest_paths["artifacts-shared"], read_only = false }] }
     "horus-jnk-srv01"   = { vmid = 103, hostname = "horus-jnk-srv01", type = "vm", target_node = "horus-pmx-node01", cores = 2, memory = 4096, disk_size = "20", ip_address = var.environment.workload_ips["horus-jnk-srv01"], vlan_id = 101 }
     "horus-ai-srv01"    = { vmid = 104, hostname = "horus-ai-srv01", type = "lxc", target_node = "horus-pmx-node01", cores = 4, memory = 6144, disk_size = "20", ip_address = var.environment.workload_ips["horus-ai-srv01"], vlan_id = 150, feature_profile = "standard" }
