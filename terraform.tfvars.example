@@ -82,7 +82,7 @@ environment = {
     infra-gitea        = "/data/example/infra/gitea"
     infra-vikunja      = "/data/example/infra/vikunja"
     artifacts-registry = "/data/example/artifacts/registry"
-    logs               = "/data/example/logs"
+    logs               = "/srv/minio"
   }
 
   nfs = {
